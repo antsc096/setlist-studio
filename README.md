@@ -40,6 +40,14 @@ Each installed copy keeps its own data, so send the band the link and use
   across sets.
 - Tick **requested by the couple** on a line, or **new song** on a song -
   new songs show red everywhere so the band can see what to learn.
+- **Load default template** fills the document with the band's usual four
+  sets plus the extras bench, in one click. Most gigs are a variation on
+  it. Songs are matched to the library by title and any the library has
+  not met yet are added to it, so it works whatever state a device is in.
+- **Crew members**: the people who turn up, saved once. Tap into Crew,
+  Sound, Point of contact or MC and their names appear as chips - tap to
+  add, tap again to drop. Type someone new and they join the list. Edit
+  the list from the ⋯ menu.
 - Multiple setlists saved side by side; duplicate one as next gig's
   starting point.
 

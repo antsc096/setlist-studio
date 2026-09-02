@@ -38,6 +38,7 @@
 <div id="menuPop" class="menu hidden">
   <button id="exportJson">Export backup (JSON)</button>
   <button id="importJson">Import backup…</button>
+  <button id="crewMembers">Crew members…</button>
   <button id="printDoc">Print / system PDF</button>
   <input type="file" id="importFile" accept="application/json" hidden>
 </div>
@@ -65,12 +66,19 @@
           <label>Point of contact <input id="hContact" autocomplete="off"></label>
           <label>MC <input id="hMc" autocomplete="off"></label>
         </div>
+        <div id="crewBar" class="crew-bar hidden">
+          <span id="crewBarLabel" class="crew-bar-label">Crew:</span>
+          <div id="crewBarChips" class="crew-bar-chips"></div>
+          <button id="crewManage" class="crew-manage">Edit crew</button>
+        </div>
         <textarea id="hNotes" rows="3" placeholder="Run sheet and notes for the band…"></textarea>
       </div>
 
       <div class="scaffold">
         <label>Sets <input id="numSets" type="number" min="1" max="8" inputmode="numeric"></label>
         <label>Songs per set <input id="songsPerSet" type="number" min="1" max="30" inputmode="numeric"></label>
+        <button id="loadTemplate" class="ghost template-btn"
+                title="Fill this setlist with the band's usual sets">Load default template</button>
         <span class="scaffold-note">A guide, not a wall - sets can run over.</span>
       </div>
 
@@ -113,9 +121,26 @@
   </div>
 </div>
 
+<div id="crewEditor" class="sheet hidden">
+  <div class="sheet-card pick-card">
+    <h2>Crew members</h2>
+    <div class="pick-song">Tap a name in any crew field instead of typing it.</div>
+    <div id="crewList" class="crew-list"></div>
+    <div class="crew-add">
+      <input id="crewNew" autocomplete="off" placeholder="Add someone">
+      <button id="crewAdd" class="ghost">Add</button>
+    </div>
+    <div class="sheet-actions">
+      <span class="grow"></span>
+      <button id="crewDone" class="primary">Done</button>
+    </div>
+  </div>
+</div>
+
 <script src="vendor/sortable.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="seed.js"></script>
+<script src="template.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,72 @@
+// The set the band starts from. Most gigs are a variation on this, so
+// "Load default template" drops it straight into the document; the
+// sheet's own event notes are deliberately left out, only the sets
+// come across. A song is matched to the library by title, and any the
+// library does not have yet are added to it.
+// eslint-disable-next-line no-unused-vars
+const DEFAULT_TEMPLATE = [
+  { label: 'SET 1', items: [
+    { title: 'Tennessee Whiskey', singer: 'Chris' },
+    { title: 'Steal My Kisses', singer: 'Chris' },
+    { title: 'On Fire', singer: 'Chris' },
+    { title: 'Fast Car', singer: 'Chris' },
+    { title: 'Suzie Q', singer: 'Chris' },
+    { title: 'Something Like Olivia', singer: 'Chris' },
+    { title: 'Cry to me', singer: 'Chris' },
+    { title: 'Come Said The Boy', singer: 'Chris' },
+    { title: 'Give Me One Reason', singer: 'Chris' },
+    { title: 'To Her Door', singer: 'Chris' },
+    { title: 'Dancing In The Dark', singer: 'Chris' },
+    { title: 'Sexual Healing', singer: 'Chris' },
+    { title: 'You Got It', singer: 'Chris' },
+    { brk: 'Dinner break', minutes: 30 },
+  ] },
+  { label: 'SET 2', items: [
+    { title: 'First Dance', singer: 'Chris' },
+    { title: 'Crazy Little Thing Called Love', singer: 'Chris' },
+    { title: 'Stuck In The Middle', singer: 'Chris' },
+    { title: 'Folsom Prison', singer: 'Chris' },
+    { title: 'Sunday Morning', singer: 'Chris' },
+    { title: 'Brown Eyed Girl', singer: 'Jerry' },
+    { title: 'Chain reaction', singer: 'Chris' },
+    { title: 'Hurt So Good', singer: 'Chris' },
+    { title: 'Tip of My Tongue', singer: 'Chris' },
+    { title: 'Walk Of Life', singer: 'Chris' },
+    { title: 'Unchain My Heart', singer: 'Chris' },
+    { title: 'Country Roads', singer: 'Chris' },
+  ] },
+  { label: 'SET 3', items: [
+    { title: 'Never Tear Us Apart', singer: 'Chris' },
+    { title: 'Valerie', singer: 'Chris' },
+    { title: 'Lover Lover, You Dont Treat Me No Good', singer: 'Chris' },
+    { title: 'Achy Breaky Heart', singer: 'Chris' },
+    { title: 'Superstition', singer: 'Jerry' },
+    { title: 'Two Strong Hearts', singer: 'Chris' },
+    { title: 'Kiss', singer: 'Chris' },
+    { title: 'Midnight Special', singer: 'Chris' },
+    { title: 'Gold on the ceiling', singer: 'Chris' },
+    { title: 'Leave Your Hat On', singer: 'Chris' },
+    { title: 'No Diggity', singer: 'Chris' },
+  ] },
+  { label: 'SET 4', items: [
+    { title: 'La Bamba', singer: 'Chris' },
+    { title: 'Dumb Things', singer: 'Chris' },
+    { title: 'Play That Funky Music', singer: 'Jerry' },
+    { title: 'Proud Mary', singer: 'Chris' },
+    { title: '9 to 5', singer: 'Chris' },
+    { title: 'Old Time Rock N Roll', singer: 'Chris' },
+    { title: 'April Sun', singer: 'Jerry' },
+    { title: 'Johnny B. Goode', singer: 'Chris' },
+    { title: 'Eagle rock', singer: 'Chris' },
+    { title: 'That\'s what i like about you', singer: 'Chris' },
+    { title: 'Call Me Al', singer: 'Jerry' },
+    { title: 'Hot Hot Hot', singer: 'Jerry' },
+  ] },
+  { label: 'Extras', items: [
+    { title: 'Everlong' },
+    { title: 'Sweet Caroline' },
+    { title: '3am' },
+    { title: 'Waiting On The World To Change' },
+    { title: 'Rain' },
+  ] },
+];

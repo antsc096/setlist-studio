@@ -239,6 +239,71 @@ main > * { min-width: 0; }
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 .scaffold-note { color: var(--ink-mute); font-size: 12px; }
+.template-btn {
+  border: 1px solid var(--accent); background: var(--accent-soft);
+  color: var(--accent-deep); padding: 7px 13px; border-radius: 9px;
+  font-weight: 600; font-size: 13px; white-space: nowrap;
+}
+.template-btn:hover { background: var(--accent); color: #fff; }
+
+/* --- Crew: tap a name instead of typing it ------------------------------ */
+.crew-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: 2px 0 10px; padding: 8px 10px;
+  background: var(--accent-soft); border-radius: 10px;
+}
+.crew-bar-label {
+  font-size: 10.5px; font-weight: 700; color: var(--accent-deep);
+  text-transform: uppercase; letter-spacing: .06em;
+  align-self: flex-start; padding-top: 7px;
+}
+.crew-bar-chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.crew-bar .chip {
+  border: 1px solid transparent; background: var(--paper);
+  color: var(--ink-dim); border-radius: 20px;
+  padding: 4px 11px; font-size: 12.5px; font-weight: 550;
+}
+.crew-bar .chip:hover { border-color: var(--accent); color: var(--accent-deep); }
+.crew-bar .chip.on {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.crew-bar .chip-empty { color: var(--accent-deep); font-size: 12px; }
+.crew-manage {
+  border: none; background: none; color: var(--accent-deep);
+  font-size: 12px; font-weight: 600; padding: 4px 6px; border-radius: 6px;
+  text-decoration: underline; white-space: nowrap;
+}
+.crew-manage:hover { background: var(--paper); text-decoration: none; }
+
+.crew-list { display: flex; flex-direction: column; gap: 5px; }
+.crew-row {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px;
+}
+.crew-name { flex: 1; font-weight: 550; }
+.crew-rm {
+  border: none; background: none; color: var(--ink-mute);
+  padding: 3px 7px; border-radius: 6px;
+}
+.crew-rm:hover { color: var(--new); background: var(--new-soft); }
+.crew-empty { color: var(--ink-mute); font-size: 13px; padding: 4px 2px; }
+.crew-add { display: flex; gap: 7px; margin-top: 10px; }
+.crew-add input {
+  flex: 1; min-width: 0; padding: 9px 12px;
+  border: 1px solid var(--line-strong); border-radius: 9px; font-size: 14.5px;
+}
+.crew-add input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.crew-add .ghost {
+  border: 1px solid var(--line-strong); background: none; border-radius: 9px;
+  padding: 9px 15px; color: var(--ink-dim); font-weight: 600;
+}
+.crew-add .ghost:hover {
+  background: var(--accent-soft); color: var(--accent-deep);
+  border-color: var(--accent-soft);
+}
 
 /* Sets */
 .set { margin-top: 22px; }
@@ -493,6 +558,7 @@ button.ghost.wide:hover {
 @media print {
   body { background: #fff; }
   .appbar, .library, .fab, .scaffold, #addSet, .menu, .disclaimer,
+  .crew-bar,
   .entry .grip, .entry .rm, .entry .flags, .set-tools { display: none !important; }
   main { display: block; padding: 0; max-width: none; }
   .paper { border: none; box-shadow: none; padding: 0; }

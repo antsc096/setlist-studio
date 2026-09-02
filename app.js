@@ -9,6 +9,12 @@
 
   const STORE_KEY = 'setlist-studio.v1';
 
+  // Who turns up. Every name field offers these instead of typing, and
+  // anyone typed in who is not on the list joins it.
+  const DEFAULT_CREW = ['Ants', 'Ris', 'Jord', 'Adam', 'Church', 'Chris',
+    'Haley', 'Jerry'];
+  const NAME_FIELDS = ['hCrew', 'hSound', 'hContact', 'hMc'];
+
   // --- State --------------------------------------------------------------
 
   let state = null;
@@ -69,6 +75,7 @@
         isNew: false,
       })),
       docs: [defaultDoc()],
+      crew: DEFAULT_CREW.slice(),
       activeDocId: null,
     };
     state.activeDocId = state.docs[0].id;
@@ -89,6 +96,7 @@
   // they are folded into one part here and the old fields dropped.
   function migrate() {
     if (!state || !Array.isArray(state.library)) return;
+    if (!Array.isArray(state.crew)) state.crew = DEFAULT_CREW.slice();
     for (const song of state.library) {
       if (!Array.isArray(song.parts)) {
         song.parts = (song.singer || song.key)
@@ -124,6 +132,25 @@
   }
 
   // --- DOM handles --------------------------------------------------------
+
+  // A crew field holds a list of people: "Ant & Ruddy", "Ruddy, Anthony".
+  const splitNames = (value) => String(value || '')
+    .split(/[,&]|\band\b/i).map((n) => n.trim()).filter(Boolean);
+  const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
+  const normTitle = (t) => String(t).toLowerCase()
+    .replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
+
+  function rememberCrew(value) {
+    let added = false;
+    for (const name of splitNames(value)) {
+      if (name.length > 40) continue;
+      if (!state.crew.some((c) => sameName(c, name))) {
+        state.crew.push(name);
+        added = true;
+      }
+    }
+    return added;
+  }
 
   const $ = (sel) => document.querySelector(sel);
   const el = (tag, cls, text) => {
@@ -549,6 +576,142 @@
     save(); closeEditor(); renderAll();
   }
 
+  // --- Crew ----------------------------------------------------------------
+
+  let crewTarget = null;   // the name field the chip bar is serving
+
+  function showCrewBar(input) {
+    crewTarget = input;
+    const label = input.closest('label');
+    $('#crewBarLabel').textContent =
+      (label ? label.textContent.trim() : 'Crew') + ':';
+    renderCrewChips();
+    $('#crewBar').classList.remove('hidden');
+  }
+
+  function hideCrewBar() {
+    $('#crewBar').classList.add('hidden');
+    crewTarget = null;
+  }
+
+  function renderCrewChips() {
+    const host = $('#crewBarChips');
+    host.innerHTML = '';
+    if (!crewTarget) return;
+    const on = splitNames(crewTarget.value);
+    for (const name of state.crew) {
+      const chip = el('button', 'chip' +
+        (on.some((n) => sameName(n, name)) ? ' on' : ''), name);
+      // Keep the caret in the field so the bar does not close under the tap.
+      chip.addEventListener('mousedown', (e) => e.preventDefault());
+      chip.addEventListener('click', () => toggleName(name));
+      host.appendChild(chip);
+    }
+    if (!state.crew.length) {
+      host.appendChild(el('span', 'chip-empty', 'No crew saved yet.'));
+    }
+  }
+
+  function toggleName(name) {
+    if (!crewTarget) return;
+    const names = splitNames(crewTarget.value);
+    const at = names.findIndex((n) => sameName(n, name));
+    if (at >= 0) names.splice(at, 1);
+    else names.push(name);
+    crewTarget.value = names.join(', ');
+    doc().header[crewTarget.dataset.field] = crewTarget.value;
+    save();
+    renderCrewChips();
+    crewTarget.focus();
+  }
+
+  function openCrewEditor() {
+    renderCrewList();
+    $('#crewNew').value = '';
+    $('#crewEditor').classList.remove('hidden');
+    $('#crewNew').focus();
+  }
+
+  function closeCrewEditor() {
+    $('#crewEditor').classList.add('hidden');
+    renderCrewChips();
+  }
+
+  function renderCrewList() {
+    const host = $('#crewList');
+    host.innerHTML = '';
+    if (!state.crew.length) {
+      host.appendChild(el('div', 'crew-empty', 'No one on the list yet.'));
+      return;
+    }
+    state.crew.forEach((name, i) => {
+      const row = el('div', 'crew-row');
+      row.appendChild(el('span', 'crew-name', name));
+      const rm = el('button', 'crew-rm', '\u2715');
+      rm.title = 'Remove ' + name;
+      rm.addEventListener('click', () => {
+        state.crew.splice(i, 1);
+        save(); renderCrewList();
+      });
+      row.appendChild(rm);
+      host.appendChild(row);
+    });
+  }
+
+  function addCrewFromEditor() {
+    const value = $('#crewNew').value.trim();
+    if (!value) return;
+    if (rememberCrew(value)) save();
+    $('#crewNew').value = '';
+    $('#crewNew').focus();
+    renderCrewList();
+  }
+
+  // --- The band's usual sets -----------------------------------------------
+
+  // One click puts the template into the document. Songs are matched to the
+  // library by title; anything the library has not met yet is added to it,
+  // so the template works whatever state a device's library is in.
+  function loadDefaultTemplate() {
+    const d = doc();
+    const filled = d.sets.reduce((n, s) => n + s.items.length, 0);
+    if (filled && !confirm('Replace the ' + filled + ' line' +
+      (filled === 1 ? '' : 's') + " in this setlist with the band's " +
+      'default template?')) return;
+
+    const byTitle = new Map();
+    for (const s of state.library) byTitle.set(normTitle(s.title), s);
+    let addedSongs = 0;
+
+    d.sets = DEFAULT_TEMPLATE.map((set) => ({
+      label: set.label,
+      items: set.items.map((entry) => {
+        if (entry.brk) {
+          return { brk: true, label: entry.brk, minutes: entry.minutes || 0 };
+        }
+        let song = byTitle.get(normTitle(entry.title));
+        if (!song) {
+          song = { id: uid(), title: entry.title, parts: [], note: '',
+            isNew: false };
+          state.library.push(song);
+          byTitle.set(normTitle(entry.title), song);
+          addedSongs++;
+        }
+        const part = (entry.singer &&
+          song.parts.find((p) => sameName(p.singer, entry.singer))) ||
+          song.parts[0];
+        return { songId: song.id, partId: part ? part.id : '',
+          requested: false };
+      }),
+    }));
+    d.numSets = d.sets.length;
+    d.activeSet = 0;
+    save(); renderAll();
+    toast('Template loaded.' + (addedSongs
+      ? ' ' + addedSongs + ' new song' + (addedSongs === 1 ? '' : 's') +
+        ' added to the library.' : ''));
+  }
+
   // --- Documents -----------------------------------------------------------
 
   function newDoc() {
@@ -937,12 +1100,42 @@
 
   function wire() {
     for (const [id, field] of headerFields) {
-      $('#' + id).addEventListener('input', (e) => {
+      const input = $('#' + id);
+      input.dataset.field = field;
+      input.addEventListener('input', (e) => {
         doc().header[field] = e.target.value;
         save();
         if (field === 'couple') renderDocPicker();
+        if (crewTarget === input) renderCrewChips();
+      });
+      if (!NAME_FIELDS.includes(id)) continue;
+      input.addEventListener('focus', () => showCrewBar(input));
+      input.addEventListener('blur', () => {
+        // A name typed by hand joins the roster.
+        if (rememberCrew(input.value)) save();
+        setTimeout(() => {
+          const now = document.activeElement;
+          if (now && $('#crewBar').contains(now)) return;
+          if (NAME_FIELDS.some((other) => now === $('#' + other))) return;
+          hideCrewBar();
+        }, 160);
       });
     }
+
+    $('#loadTemplate').addEventListener('click', loadDefaultTemplate);
+    $('#crewManage').addEventListener('click', openCrewEditor);
+    $('#crewMembers').addEventListener('click', () => {
+      $('#menuPop').classList.add('hidden');
+      openCrewEditor();
+    });
+    $('#crewAdd').addEventListener('click', addCrewFromEditor);
+    $('#crewDone').addEventListener('click', closeCrewEditor);
+    $('#crewEditor').addEventListener('click', (e) => {
+      if (e.target === $('#crewEditor')) closeCrewEditor();
+    });
+    $('#crewNew').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); addCrewFromEditor(); }
+    });
 
     $('#docPicker').addEventListener('change', (e) => {
       state.activeDocId = e.target.value;
@@ -983,7 +1176,9 @@
       if (e.target === $('#singerPick')) closePicker();
     });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') { closeEditor(); closePicker(); }
+      if (e.key === 'Escape') {
+        closeEditor(); closePicker(); closeCrewEditor();
+      }
       if (e.key === 'Enter' &&
           !$('#songEditor').classList.contains('hidden') &&
           e.target.tagName === 'INPUT') saveEditor();
