@@ -1,0 +1,307 @@
+/* Setlist Studio - a paper document with a song library beside it.
+   Light, print-adjacent, one deep-teal accent; red is reserved for
+   "new song, learn this". System faces only: the app must work with
+   the network cable cut. */
+
+:root {
+  --ink: #1d2724;
+  --ink-dim: #5c6a66;
+  --ink-mute: #93a09c;
+  --paper: #ffffff;
+  --ground: #eceeed;
+  --line: #d8dedc;
+  --accent: #0f4c44;
+  --accent-soft: #e3efec;
+  --new: #c22c2c;
+  --new-soft: #fbeaea;
+  --req: #8a6d1e;
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font: 15px/1.45 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+button { font: inherit; cursor: pointer; }
+input, textarea, select { font: inherit; color: inherit; }
+
+/* --- App bar ----------------------------------------------------------- */
+.appbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px;
+  background: var(--accent); color: #f2f7f5;
+  flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.doc-controls, .exports { display: flex; align-items: center; gap: 6px; }
+.exports { margin-left: auto; }
+.appbar select {
+  max-width: 220px; padding: 6px 8px; border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.35);
+  background: rgba(255,255,255,.12); color: #fff;
+}
+.appbar select option { color: #1d2724; }
+.appbar .ghost {
+  background: transparent; color: #e7f0ee;
+  border: 1px solid rgba(255,255,255,.35);
+  padding: 6px 10px; border-radius: 6px;
+}
+.appbar .ghost:hover { background: rgba(255,255,255,.12); }
+.appbar .ghost.danger { color: #ffd7d7; border-color: rgba(255,215,215,.5); }
+.appbar .primary {
+  background: #fff; color: var(--accent); font-weight: 600;
+  border: none; padding: 6px 14px; border-radius: 6px;
+}
+
+.menu {
+  position: fixed; top: 54px; right: 14px; z-index: 40;
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0,0,0,.14);
+  display: flex; flex-direction: column; min-width: 210px; padding: 6px;
+}
+.menu button {
+  text-align: left; background: none; border: none;
+  padding: 9px 12px; border-radius: 6px;
+}
+.menu button:hover { background: var(--accent-soft); }
+.hidden { display: none !important; }
+
+/* --- Layout ------------------------------------------------------------ */
+main {
+  display: grid; grid-template-columns: 330px 1fr;
+  gap: 16px; padding: 16px;
+  max-width: 1200px; margin: 0 auto;
+  align-items: start;
+}
+
+/* --- Library ----------------------------------------------------------- */
+.library {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius);
+  position: sticky; top: 66px;
+  max-height: calc(100vh - 84px);
+  display: flex; flex-direction: column;
+}
+.lib-head { display: flex; gap: 6px; padding: 10px 10px 6px; }
+.lib-head input {
+  flex: 1; padding: 7px 10px; border: 1px solid var(--line);
+  border-radius: 6px; background: #fafbfb;
+}
+.lib-head .ghost {
+  border: 1px solid var(--line); background: none; border-radius: 6px;
+  padding: 6px 10px; color: var(--accent); font-weight: 600; white-space: nowrap;
+}
+.lib-hint { padding: 0 12px 8px; color: var(--ink-mute); font-size: 12.5px; }
+.lib-list {
+  list-style: none; margin: 0; padding: 0 6px 8px;
+  overflow-y: auto;
+}
+.lib-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 6px; cursor: pointer;
+}
+.lib-row:hover { background: var(--accent-soft); }
+.lib-row .t { flex: 1; min-width: 0; }
+.lib-row .t .title { font-weight: 500; }
+.lib-row .t .title.is-new { color: var(--new); }
+.lib-row .t .meta { color: var(--ink-dim); font-size: 12.5px; }
+.lib-row .in-doc { color: var(--accent); font-size: 12px; font-weight: 600; }
+.lib-row .edit {
+  border: none; background: none; color: var(--ink-mute);
+  padding: 4px 6px; border-radius: 4px; font-size: 13px;
+}
+.lib-row .edit:hover { background: #fff; color: var(--ink); }
+
+/* --- Document ---------------------------------------------------------- */
+.paper {
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 28px 32px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.05);
+}
+.doc-header { border-bottom: 2px solid var(--ink); padding-bottom: 14px; }
+.h-title {
+  width: 100%; border: none; outline: none;
+  font-size: 26px; font-weight: 700; letter-spacing: -0.01em;
+  padding: 0 0 6px;
+}
+.h-title::placeholder { color: var(--ink-mute); font-weight: 600; }
+.h-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 4px 18px; margin: 4px 0 8px;
+}
+.h-grid label {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 12px; color: var(--ink-dim); text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.h-grid input {
+  flex: 1; min-width: 0; border: none; outline: none;
+  border-bottom: 1px dashed var(--line);
+  font-size: 14px; padding: 2px 0; text-transform: none; letter-spacing: 0;
+}
+.h-grid input:focus { border-bottom-color: var(--accent); }
+#hNotes {
+  width: 100%; border: none; outline: none; resize: vertical;
+  background: #fafbfb; border-radius: 6px; padding: 8px 10px;
+  font-size: 13.5px; color: var(--ink-dim);
+}
+
+.scaffold {
+  display: flex; align-items: center; gap: 16px;
+  padding: 12px 0 4px; flex-wrap: wrap;
+}
+.scaffold label {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--ink-dim); text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.scaffold input {
+  width: 58px; padding: 5px 8px; border: 1px solid var(--line);
+  border-radius: 6px; text-align: center;
+}
+.scaffold-note { color: var(--ink-mute); font-size: 12.5px; }
+
+/* Sets */
+.set { margin-top: 18px; }
+.set-head {
+  display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--ink); padding-bottom: 4px;
+}
+.set-head.active-target { background: var(--accent-soft); border-radius: 6px 6px 0 0; }
+.set-label {
+  border: none; outline: none; font-weight: 700; font-size: 16px;
+  letter-spacing: .02em; width: 40%; min-width: 120px; background: transparent;
+}
+.set-count { color: var(--ink-mute); font-size: 12.5px; margin-left: auto; }
+.set-count.over { color: var(--req); }
+.set-tools { display: flex; gap: 2px; }
+.set-tools button {
+  border: none; background: none; color: var(--ink-mute);
+  padding: 3px 7px; border-radius: 4px; font-size: 13px;
+}
+.set-tools button:hover { background: var(--accent-soft); color: var(--ink); }
+
+.set-items { list-style: none; margin: 0; padding: 2px 0 0; min-height: 14px; }
+.entry {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 4px 4px 0; border-radius: 5px;
+}
+.entry:hover { background: #f6f8f7; }
+.entry .num {
+  width: 24px; text-align: right; color: var(--ink-dim);
+  font-variant-numeric: tabular-nums; flex: none;
+}
+.entry .grip { color: var(--ink-mute); cursor: grab; padding: 2px 4px; flex: none; }
+.entry .song { flex: 1; min-width: 0; }
+.entry .song .title { font-weight: 500; }
+.entry .song .note { color: var(--ink-dim); font-size: 12.5px; }
+.entry.is-new { background: var(--new-soft); }
+.entry.is-new .title { color: var(--new); font-weight: 600; }
+.entry .key {
+  width: 46px; text-align: center; font-weight: 600; flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.entry .singer { width: 70px; color: var(--ink-dim); font-size: 13px; flex: none; }
+.entry .flags { display: flex; gap: 8px; flex: none; }
+.entry .flags label {
+  display: flex; align-items: center; gap: 3px;
+  font-size: 11px; color: var(--ink-mute); cursor: pointer;
+  text-transform: uppercase; letter-spacing: .03em;
+}
+.entry.requested .flags .req-l { color: var(--req); font-weight: 700; }
+.entry .rm {
+  border: none; background: none; color: var(--ink-mute);
+  padding: 2px 6px; border-radius: 4px; flex: none;
+}
+.entry .rm:hover { color: var(--new); background: var(--new-soft); }
+
+.entry.break-row { color: var(--ink-dim); font-style: italic; }
+.entry.break-row .b-label {
+  flex: 1; border: none; outline: none; font: inherit; color: inherit;
+  background: transparent;
+}
+.entry.break-row .b-min {
+  width: 52px; border: none; outline: none; text-align: right;
+  font: inherit; color: inherit; background: transparent;
+}
+.entry.break-row .b-unit { color: var(--ink-mute); font-size: 12px; }
+
+.sortable-ghost { opacity: .4; }
+.sortable-drag { background: var(--paper); box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+
+.wide { width: 100%; margin-top: 16px; }
+button.ghost.wide {
+  border: 1px dashed var(--line); background: none; color: var(--ink-dim);
+  padding: 8px; border-radius: 6px;
+}
+button.ghost.wide:hover { color: var(--accent); border-color: var(--accent); }
+
+/* --- Song editor sheet -------------------------------------------------- */
+.sheet {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(20, 30, 27, .45);
+  display: flex; align-items: center; justify-content: center; padding: 18px;
+}
+.sheet-card {
+  background: var(--paper); border-radius: 10px; padding: 20px;
+  width: 100%; max-width: 420px; box-shadow: 0 12px 48px rgba(0,0,0,.25);
+}
+.sheet-card h2 { margin: 0 0 12px; font-size: 18px; }
+.sheet-card label { display: block; margin-bottom: 10px; font-size: 13px; color: var(--ink-dim); }
+.sheet-card label input[type="text"], .sheet-card label input:not([type]) {
+  display: block; width: 100%; margin-top: 3px;
+  padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+}
+.sheet-card .check { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.sheet-actions { display: flex; gap: 8px; margin-top: 14px; align-items: center; }
+.sheet-actions .grow { flex: 1; }
+.sheet-actions .primary {
+  background: var(--accent); color: #fff; border: none;
+  padding: 8px 16px; border-radius: 6px; font-weight: 600;
+}
+.sheet-actions .ghost {
+  background: none; border: 1px solid var(--line);
+  padding: 8px 12px; border-radius: 6px; color: var(--ink-dim);
+}
+.sheet-actions .ghost.danger { color: var(--new); border-color: var(--new-soft); }
+
+/* --- Phone -------------------------------------------------------------- */
+.fab { display: none; }
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; padding: 10px; }
+  .paper { padding: 18px 14px; }
+  .h-grid { grid-template-columns: 1fr 1fr; }
+  .entry .singer { display: none; }
+  .library {
+    position: fixed; inset: auto 0 0 0; top: 30%; z-index: 45;
+    border-radius: 14px 14px 0 0; max-height: none;
+    box-shadow: 0 -8px 32px rgba(0,0,0,.25);
+    transform: translateY(105%); transition: transform .25s ease;
+  }
+  .library.open { transform: translateY(0); }
+  .fab {
+    display: block; position: fixed; right: 16px; bottom: 16px; z-index: 44;
+    background: var(--accent); color: #fff; border: none;
+    padding: 12px 18px; border-radius: 24px; font-weight: 600;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  }
+  .appbar { gap: 8px; }
+  .exports { margin-left: 0; }
+}
+
+/* --- Print: the paper is the page --------------------------------------- */
+@media print {
+  body { background: #fff; }
+  .appbar, .library, .fab, .scaffold, #addSet, .menu,
+  .entry .grip, .entry .rm, .entry .flags, .set-tools { display: none !important; }
+  main { display: block; padding: 0; max-width: none; }
+  .paper { border: none; box-shadow: none; padding: 0; }
+  .entry:hover { background: none; }
+  .set { break-inside: avoid-page; }
+}

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f4c44">
+<title>Setlist Studio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="appbar">
+  <div class="brand">
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="2.6" rx="1.3" fill="currentColor"/>
+      <rect x="3" y="10.7" width="13" height="2.6" rx="1.3" fill="currentColor"/>
+      <rect x="3" y="17.4" width="16" height="2.6" rx="1.3" fill="currentColor"/>
+    </svg>
+    <span>Setlist Studio</span>
+  </div>
+  <div class="doc-controls">
+    <select id="docPicker" title="Saved setlists"></select>
+    <button id="newDoc" class="ghost" title="New setlist">New</button>
+    <button id="dupDoc" class="ghost" title="Duplicate this setlist">Duplicate</button>
+    <button id="delDoc" class="ghost danger" title="Delete this setlist">Delete</button>
+  </div>
+  <div class="exports">
+    <button id="exportPdf" class="primary">PDF</button>
+    <button id="copySheets" class="ghost" title="Copy as cells for Google Sheets">Copy for Sheets</button>
+    <button id="menuBtn" class="ghost" title="Backup and restore">⋯</button>
+  </div>
+</header>
+
+<div id="menuPop" class="menu hidden">
+  <button id="exportJson">Export backup (JSON)</button>
+  <button id="importJson">Import backup…</button>
+  <button id="printDoc">Print / system PDF</button>
+  <input type="file" id="importFile" accept="application/json" hidden>
+</div>
+
+<main>
+  <aside class="library" id="libraryPane">
+    <div class="lib-head">
+      <input type="search" id="libSearch" placeholder="Search songs" autocomplete="off">
+      <button id="libAdd" class="ghost" title="Add a song to the library">+ Song</button>
+    </div>
+    <div class="lib-hint">Tap a song to add it to the highlighted set.</div>
+    <ul id="libList" class="lib-list"></ul>
+  </aside>
+
+  <section class="document" id="documentPane">
+    <div class="paper" id="paper">
+      <div class="doc-header">
+        <input id="hCouple" class="h-title" placeholder="Couple / event name" autocomplete="off">
+        <div class="h-grid">
+          <label>Venue <input id="hVenue" autocomplete="off"></label>
+          <label>Date <input id="hDate" autocomplete="off"></label>
+          <label>Crew <input id="hCrew" autocomplete="off"></label>
+          <label>Sound <input id="hSound" autocomplete="off"></label>
+          <label>Point of contact <input id="hContact" autocomplete="off"></label>
+          <label>MC <input id="hMc" autocomplete="off"></label>
+        </div>
+        <textarea id="hNotes" rows="3" placeholder="Run sheet and notes for the band…"></textarea>
+      </div>
+
+      <div class="scaffold">
+        <label>Sets <input id="numSets" type="number" min="1" max="8" inputmode="numeric"></label>
+        <label>Songs per set <input id="songsPerSet" type="number" min="1" max="30" inputmode="numeric"></label>
+        <span class="scaffold-note">A guide, not a wall - sets can run over.</span>
+      </div>
+
+      <div id="sets"></div>
+      <button id="addSet" class="ghost wide">+ Add another set</button>
+    </div>
+  </section>
+</main>
+
+<button id="libToggle" class="fab" title="Song library">Library</button>
+
+<div id="songEditor" class="sheet hidden">
+  <div class="sheet-card">
+    <h2 id="seTitle">New song</h2>
+    <label>Title <input id="seSongTitle" autocomplete="off"></label>
+    <label>Key <input id="seKey" autocomplete="off" placeholder="e.g. G, F#m, Bb"></label>
+    <label>Sung by <input id="seSinger" autocomplete="off"></label>
+    <label>Note <input id="seNote" autocomplete="off" placeholder="e.g. full step down"></label>
+    <label class="check"><input id="seNew" type="checkbox"> New song (band still learning - shows red)</label>
+    <div class="sheet-actions">
+      <button id="seDelete" class="ghost danger">Delete</button>
+      <span class="grow"></span>
+      <button id="seCancel" class="ghost">Cancel</button>
+      <button id="seSave" class="primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<script src="vendor/sortable.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="seed.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
