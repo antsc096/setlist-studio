@@ -276,6 +276,9 @@ button.ghost.wide:hover { color: var(--accent); border-color: var(--accent); }
 @media (max-width: 760px) {
   main { grid-template-columns: 1fr; padding: 10px; }
   .paper { padding: 18px 14px; }
+  .set-label { width: 30%; min-width: 84px; font-size: 15px; }
+  .set-tools button { padding: 3px 4px; font-size: 12px; }
+  .entry .flags label { font-size: 10px; }
   .h-grid { grid-template-columns: 1fr 1fr; }
   .entry .singer { display: none; }
   .library {
