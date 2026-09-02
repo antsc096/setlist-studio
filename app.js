@@ -213,7 +213,8 @@
     li.appendChild(el('span', 'grip', '⋮⋮'));
 
     const body = el('div', 'song');
-    const title = el('div', 'title', song ? song.title : '(deleted song)');
+    const title = el('div', 'title' + (item.requested ? ' requested' : ''),
+      song ? song.title : '(deleted song)');
     body.appendChild(title);
     if (song && song.note) body.appendChild(el('div', 'note', song.note));
     body.addEventListener('click', () => { if (song) openEditor(song); });
@@ -374,7 +375,6 @@
     $('#seKey').value = song ? song.key : '';
     $('#seSinger').value = song ? song.singer : '';
     $('#seNote').value = song ? song.note : '';
-    $('#seNew').checked = song ? !!song.isNew : false;
     $('#seDelete').classList.toggle('hidden', !song);
     $('#songEditor').classList.remove('hidden');
     $('#seSongTitle').focus();
@@ -392,10 +392,9 @@
       key: $('#seKey').value.trim(),
       singer: $('#seSinger').value.trim(),
       note: $('#seNote').value.trim(),
-      isNew: $('#seNew').checked,
     };
     if (editing) Object.assign(editing, values);
-    else state.library.push(Object.assign({ id: uid() }, values));
+    else state.library.push(Object.assign({ id: uid(), isNew: false }, values));
     save(); closeEditor(); renderAll();
   }
 
@@ -471,27 +470,111 @@
     return (base || 'setlist') + '.' + ext;
   }
 
-  function copyForSheets() {
+  function writeClipboard(html, text, done) {
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([text], { type: 'text/plain' }),
+      })]).then(done, () => navigator.clipboard.writeText(text).then(done,
+        () => toast('Could not reach the clipboard.')));
+    } else {
+      navigator.clipboard.writeText(text).then(done,
+        () => toast('Could not reach the clipboard.'));
+    }
+  }
+
+  const esc = (t) => String(t).replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  function songCellHtml(song, item) {
+    let t = esc(song.title);
+    if (item.requested) t = '<b>' + t + '</b>';
+    if (song.isNew) t = '<span style="color:#c22c2c">' + t + '</span>';
+    return t;
+  }
+
+  // A formatted document for Google Docs: header lines, then one real
+  // table per set. Requested songs are bold, new songs red - no extra
+  // columns carrying what type can say.
+  function copyForDocs() {
     const d = doc();
-    const rows = [['Set', '#', 'Song', 'Key', 'Singer', 'Note', 'Requested', 'New']];
-    d.sets.forEach((set) => {
+    let html = '<meta charset="utf-8">';
+    html += '<h1>' + esc(d.header.couple || 'Setlist') + '</h1>';
+    const meta = [
+      ['Venue', d.header.venue], ['Date', d.header.date],
+      ['Crew', d.header.crew], ['Sound', d.header.sound],
+      ['Point of contact', d.header.contact], ['MC', d.header.mc],
+    ].filter(([, v]) => v);
+    for (const [k, v] of meta) {
+      html += '<p><b>' + k + ':</b> ' + esc(v) + '</p>';
+    }
+    if (d.header.notes) {
+      html += '<p>' + esc(d.header.notes).replace(/\n/g, '<br>') + '</p>';
+    }
+    let text = (d.header.couple || 'Setlist') + '\n';
+    for (const set of d.sets) {
+      html += '<h2>' + esc(set.label) + '</h2>';
+      html += '<table border="1" style="border-collapse:collapse">' +
+        '<tr><th>#</th><th>Song</th><th>Key</th><th>Singer</th></tr>';
+      text += '\n' + set.label + '\n';
       let n = 0;
       for (const item of set.items) {
         if (item.brk) {
-          rows.push([set.label, '', 'BREAK: ' + (item.label || 'Break'),
-            '', '', item.minutes ? item.minutes + ' min' : '', '', '']);
+          html += '<tr><td></td><td colspan="3"><i>' +
+            esc(item.label || 'Break') +
+            (item.minutes ? ' (' + item.minutes + ' min)' : '') +
+            '</i></td></tr>';
+          text += '- ' + (item.label || 'Break') + '\n';
           continue;
         }
         const song = songById(item.songId);
         if (!song) continue;
-        rows.push([set.label, ++n, song.title, song.key, song.singer,
-          song.note || '', item.requested ? 'yes' : '', song.isNew ? 'yes' : '']);
+        n++;
+        const note = song.note
+          ? ' <i style="color:#5c6a66">' + esc(song.note) + '</i>' : '';
+        html += '<tr><td>' + n + '</td><td>' + songCellHtml(song, item) +
+          note + '</td><td><b>' + esc(song.key || '') + '</b></td><td>' +
+          esc(song.singer || '') + '</td></tr>';
+        text += n + '. ' + song.title + '  ' + (song.key || '') + '  ' +
+          (song.singer || '') + '\n';
+      }
+      html += '</table>';
+    }
+    writeClipboard(html, text,
+      () => toast('Copied. Paste straight into a Google Doc.'));
+  }
+
+  function copyForSheets() {
+    const d = doc();
+    const header = ['Set', '#', 'Song', 'Key', 'Singer', 'Note'];
+    const rows = [];
+    d.sets.forEach((set) => {
+      let n = 0;
+      for (const item of set.items) {
+        if (item.brk) {
+          rows.push({ cells: [set.label, '', (item.label || 'Break'),
+            '', '', item.minutes ? item.minutes + ' min' : ''] });
+          continue;
+        }
+        const song = songById(item.songId);
+        if (!song) continue;
+        rows.push({ song, item, cells: [set.label, ++n, song.title,
+          song.key, song.singer, song.note || ''] });
       }
     });
-    const tsv = rows.map((r) => r.join('\t')).join('\n');
-    navigator.clipboard.writeText(tsv).then(
-      () => toast('Copied. Paste straight into Google Sheets.'),
-      () => toast('Could not reach the clipboard.'));
+    const tsv = [header.join('\t')]
+      .concat(rows.map((r) => r.cells.join('\t'))).join('\n');
+    let html = '<meta charset="utf-8"><table><tr>' +
+      header.map((c) => '<th>' + c + '</th>').join('') + '</tr>';
+    for (const r of rows) {
+      const cells = r.cells.map((c, i) =>
+        (i === 2 && r.song) ? songCellHtml(r.song, r.item) : esc(c));
+      html += '<tr>' + cells.map((c) => '<td>' + c + '</td>').join('') +
+        '</tr>';
+    }
+    html += '</table>';
+    writeClipboard(html, tsv,
+      () => toast('Copied. Paste straight into Google Sheets.'));
   }
 
   function exportJson() {
@@ -613,7 +696,7 @@
         }
         const song = songById(item.songId);
         if (!song) continue;
-        ensureRoom(16);
+        ensureRoom(song.note ? 27 : 16);
         n++;
 
         pdf.setFont('helvetica', 'normal');
@@ -622,17 +705,15 @@
 
         if (song.isNew) pdf.setTextColor(...red);
         else pdf.setTextColor(...ink);
-        pdf.setFont('helvetica', song.isNew ? 'bold' : 'normal');
+        const bold = song.isNew || item.requested;
+        if (item.requested) anyRequested = true;
+        pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+        const maxTitleW = colKey - 12 - (margin + 22);
         let title = song.title;
-        if (item.requested) { title += ' *'; anyRequested = true; }
-        pdf.text(title, margin + 22, y);
-        if (song.note) {
-          pdf.setFont('helvetica', 'italic');
-          pdf.setFontSize(9);
-          pdf.setTextColor(...dim);
-          pdf.text(song.note, margin + 22 + pdf.getTextWidth(title) + 8, y);
-          pdf.setFontSize(11);
+        while (pdf.getTextWidth(title) > maxTitleW && title.length > 4) {
+          title = title.slice(0, -2).trimEnd() + '…';
         }
+        pdf.text(title, margin + 22, y);
 
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(...ink);
@@ -641,6 +722,16 @@
         pdf.setTextColor(...dim);
         pdf.text(song.singer || '', colSinger, y);
         pdf.setTextColor(...ink);
+
+        if (song.note) {
+          y += 11;
+          pdf.setFont('helvetica', 'italic');
+          pdf.setFontSize(9);
+          pdf.setTextColor(...dim);
+          pdf.text(song.note, margin + 22, y);
+          pdf.setFontSize(11);
+          pdf.setTextColor(...ink);
+        }
         y += 15;
       }
     }
@@ -651,7 +742,7 @@
     pdf.setFont('helvetica', 'italic');
     pdf.setTextColor(...dim);
     const legend = [];
-    if (anyRequested) legend.push('* requested by the couple');
+    if (anyRequested) legend.push('bold = requested by the couple');
     if (state.library.some((s) => s.isNew &&
         d.sets.some((set) => set.items.some((i) => i.songId === s.id)))) {
       legend.push('red = new song');
@@ -738,6 +829,7 @@
     });
 
     $('#exportPdf').addEventListener('click', exportPdf);
+    $('#copyDocs').addEventListener('click', copyForDocs);
     $('#copySheets').addEventListener('click', copyForSheets);
     $('#menuBtn').addEventListener('click', () =>
       $('#menuPop').classList.toggle('hidden'));
@@ -761,8 +853,13 @@
       $('#menuPop').classList.add('hidden'); window.print();
     });
 
+    const setLibOpen = (open) => {
+      $('#libraryPane').classList.toggle('open', open);
+      $('#libToggle').textContent = open ? 'Close' : 'Library';
+    };
     $('#libToggle').addEventListener('click', () =>
-      $('#libraryPane').classList.toggle('open'));
+      setLibOpen(!$('#libraryPane').classList.contains('open')));
+    $('#libClose').addEventListener('click', () => setLibOpen(false));
   }
 
   // --- Boot ----------------------------------------------------------------

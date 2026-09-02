@@ -1,0 +1,9 @@
+/* Inter (variable, latin subset), vendored so the app works offline.
+ * Copyright The Inter Project Authors - SIL Open Font License 1.1. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('inter-latin.woff2') format('woff2');
+}

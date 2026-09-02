@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="vendor/inter.css">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -28,6 +29,7 @@
   </div>
   <div class="exports">
     <button id="exportPdf" class="primary">PDF</button>
+    <button id="copyDocs" class="ghost" title="Copy as a formatted table for Google Docs">Copy for Docs</button>
     <button id="copySheets" class="ghost" title="Copy as cells for Google Sheets">Copy for Sheets</button>
     <button id="menuBtn" class="ghost" title="Backup and restore">⋯</button>
   </div>
@@ -43,6 +45,7 @@
 <main>
   <aside class="library" id="libraryPane">
     <div class="lib-head">
+      <button id="libClose" class="lib-close" title="Close the library">✕</button>
       <input type="search" id="libSearch" placeholder="Search songs" autocomplete="off">
       <button id="libAdd" class="ghost" title="Add a song to the library">+ Song</button>
     </div>
@@ -86,7 +89,6 @@
     <label>Key <input id="seKey" autocomplete="off" placeholder="e.g. G, F#m, Bb"></label>
     <label>Sung by <input id="seSinger" autocomplete="off"></label>
     <label>Note <input id="seNote" autocomplete="off" placeholder="e.g. full step down"></label>
-    <label class="check"><input id="seNew" type="checkbox"> New song (band still learning - shows red)</label>
     <div class="sheet-actions">
       <button id="seDelete" class="ghost danger">Delete</button>
       <span class="grow"></span>
