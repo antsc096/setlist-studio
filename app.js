@@ -36,11 +36,27 @@
     return doc;
   }
 
+  // The seed file writes each song's singers as "Chris A, Adam G" - one
+  // name and key per singer. A name on its own is a singer whose key the
+  // band never wrote down.
+  function parseSung(sung) {
+    return String(sung || '').split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const bits = entry.split(/\s+/);
+        const key = bits.length > 1 ? bits.pop() : '';
+        return { id: uid(), singer: bits.join(' '), key };
+      });
+  }
+
   function load() {
     try {
       const raw = localStorage.getItem(STORE_KEY);
       if (raw) {
         state = JSON.parse(raw);
+        migrate();
+        save();
         return;
       }
     } catch (e) { /* fall through to a fresh start */ }
@@ -48,8 +64,7 @@
       library: SEED_LIBRARY.map((s) => ({
         id: uid(),
         title: s.title,
-        key: s.key || '',
-        singer: s.singer || '',
+        parts: parseSung(s.sung),
         note: s.note || '',
         isNew: false,
       })),
@@ -68,6 +83,45 @@
     state.docs.find((d) => d.id === state.activeDocId) || state.docs[0];
 
   const songById = (id) => state.library.find((s) => s.id === id) || null;
+
+  // A song is sung by one or more people, each in their own key: that pair
+  // is a "part". Older saves carried a single key/singer on the song, so
+  // they are folded into one part here and the old fields dropped.
+  function migrate() {
+    if (!state || !Array.isArray(state.library)) return;
+    for (const song of state.library) {
+      if (!Array.isArray(song.parts)) {
+        song.parts = (song.singer || song.key)
+          ? [{ id: uid(), singer: song.singer || '', key: song.key || '' }]
+          : [];
+      }
+      for (const part of song.parts) if (!part.id) part.id = uid();
+      delete song.singer;
+      delete song.key;
+    }
+    for (const d of (state.docs || [])) {
+      for (const set of (d.sets || [])) {
+        for (const item of set.items) {
+          if (item.brk || item.partId) continue;
+          const song = songById(item.songId);
+          if (song && song.parts.length) item.partId = song.parts[0].id;
+        }
+      }
+    }
+  }
+
+  const BLANK_PART = { id: '', singer: '', key: '' };
+
+  // Which singer this line is pinned to. A line whose singer has since been
+  // deleted falls back to the first, rather than showing nothing.
+  function partFor(song, item) {
+    if (!song || !song.parts || !song.parts.length) return BLANK_PART;
+    if (item && item.partId) {
+      const hit = song.parts.find((p) => p.id === item.partId);
+      if (hit) return hit;
+    }
+    return song.parts[0];
+  }
 
   // --- DOM handles --------------------------------------------------------
 
@@ -220,8 +274,22 @@
     body.addEventListener('click', () => { if (song) openEditor(song); });
     li.appendChild(body);
 
-    li.appendChild(el('span', 'key', song ? song.key : ''));
-    li.appendChild(el('span', 'singer', song ? song.singer : ''));
+    const part = partFor(song, item);
+    const manySingers = !!(song && song.parts.length > 1);
+    const keyEl = el('span', 'key' + (manySingers ? ' pickable' : ''), part.key);
+    const singerEl = el('span',
+      'singer' + (manySingers ? ' pickable' : ''), part.singer);
+    if (manySingers) {
+      const swap = () => askSinger(song, (chosen) => {
+        item.partId = chosen.id;
+        save(); renderSets();
+      });
+      keyEl.title = singerEl.title = 'Tap to change who sings it';
+      keyEl.addEventListener('click', swap);
+      singerEl.addEventListener('click', swap);
+    }
+    li.appendChild(keyEl);
+    li.appendChild(singerEl);
 
     const flags = el('div', 'flags');
     const reqL = el('label', 'req-l');
@@ -328,8 +396,11 @@
       const t = el('div', 't');
       t.appendChild(el('div',
         'title' + (song.isNew ? ' is-new' : ''), song.title));
-      t.appendChild(el('div', 'meta',
-        [song.key, song.singer, song.note].filter(Boolean).join(' · ')));
+      const meta = song.parts
+        .map((p) => [p.key, p.singer].filter(Boolean).join(' '))
+        .filter(Boolean);
+      if (song.note) meta.push(song.note);
+      t.appendChild(el('div', 'meta', meta.join(' · ')));
       li.appendChild(t);
 
       const uses = inDoc.get(song.id) || 0;
@@ -355,13 +426,43 @@
   }
 
   function addSongToActive(song) {
+    if (song.parts.length > 1) {
+      askSinger(song, (part) => placeSong(song, part.id));
+      return;
+    }
+    placeSong(song, song.parts.length ? song.parts[0].id : '');
+  }
+
+  function placeSong(song, partId) {
     const d = doc();
     if (!d.sets.length) {
       d.sets.push({ label: 'SET 1', items: [] });
       d.numSets = 1;
     }
-    d.sets[d.activeSet].items.push({ songId: song.id, requested: false });
+    d.sets[d.activeSet].items.push({
+      songId: song.id, partId, requested: false,
+    });
     save(); renderSets(); renderLibrary();
+  }
+
+  // --- "Who's singing?" ----------------------------------------------------
+
+  function askSinger(song, onPick) {
+    $('#spSong').textContent = song.title;
+    const list = $('#spList');
+    list.innerHTML = '';
+    for (const part of song.parts) {
+      const b = el('button', 'pick');
+      b.appendChild(el('span', 'pick-singer', part.singer || 'Unnamed'));
+      b.appendChild(el('span', 'pick-key', part.key || '—'));
+      b.addEventListener('click', () => { closePicker(); onPick(part); });
+      list.appendChild(b);
+    }
+    $('#singerPick').classList.remove('hidden');
+  }
+
+  function closePicker() {
+    $('#singerPick').classList.add('hidden');
   }
 
   // --- Song editor sheet ---------------------------------------------------
@@ -372,12 +473,42 @@
     editing = song || null;
     $('#seTitle').textContent = song ? 'Edit song' : 'New song';
     $('#seSongTitle').value = song ? song.title : '';
-    $('#seKey').value = song ? song.key : '';
-    $('#seSinger').value = song ? song.singer : '';
+    $('#sePartList').innerHTML = '';
+    const parts = (song && song.parts.length) ? song.parts : [];
+    if (parts.length) parts.forEach(addPartRow);
+    else addPartRow();
     $('#seNote').value = song ? song.note : '';
     $('#seDelete').classList.toggle('hidden', !song);
     $('#songEditor').classList.remove('hidden');
     $('#seSongTitle').focus();
+  }
+
+  function addPartRow(part) {
+    const row = el('div', 'part-row');
+    row.dataset.id = (part && part.id) || '';
+
+    const singer = el('input', 'p-singer');
+    singer.placeholder = 'Singer';
+    singer.autocomplete = 'off';
+    singer.value = (part && part.singer) || '';
+    row.appendChild(singer);
+
+    const key = el('input', 'p-key');
+    key.placeholder = 'Key';
+    key.autocomplete = 'off';
+    key.value = (part && part.key) || '';
+    row.appendChild(key);
+
+    const rm = el('button', 'p-rm', '✕');
+    rm.title = 'Remove this singer';
+    rm.addEventListener('click', () => {
+      row.remove();
+      if (!$('#sePartList').children.length) addPartRow();
+    });
+    row.appendChild(rm);
+
+    $('#sePartList').appendChild(row);
+    return row;
   }
 
   function closeEditor() {
@@ -387,12 +518,14 @@
   function saveEditor() {
     const title = $('#seSongTitle').value.trim();
     if (!title) { $('#seSongTitle').focus(); return; }
-    const values = {
-      title,
-      key: $('#seKey').value.trim(),
-      singer: $('#seSinger').value.trim(),
-      note: $('#seNote').value.trim(),
-    };
+    const parts = [];
+    for (const row of $('#sePartList').children) {
+      const singer = row.querySelector('.p-singer').value.trim();
+      const key = row.querySelector('.p-key').value.trim();
+      if (!singer && !key) continue;
+      parts.push({ id: row.dataset.id || uid(), singer, key });
+    }
+    const values = { title, parts, note: $('#seNote').value.trim() };
     if (editing) Object.assign(editing, values);
     else state.library.push(Object.assign({ id: uid(), isNew: false }, values));
     save(); closeEditor(); renderAll();
@@ -493,6 +626,14 @@
     return t;
   }
 
+  // Google Docs sizes a pasted table to its contents, so a table of short
+  // song titles ends up as a narrow strip floating on the page. Declaring a
+  // width per column fixes that: these add up to 600pt, the text column of
+  // an A4 page with the default margins, so the table always spans it.
+  const DOC_COLS = [36, 372, 72, 120];
+  const CELL = 'padding:4px 7px;border:1px solid #b8c1be;vertical-align:top;';
+  const cellStyle = (i) => 'width:' + DOC_COLS[i] + 'px;' + CELL;
+
   // A formatted document for Google Docs: header lines, then one real
   // table per set. Requested songs are bold, new songs red - no extra
   // columns carrying what type can say.
@@ -514,13 +655,20 @@
     let text = (d.header.couple || 'Setlist') + '\n';
     for (const set of d.sets) {
       html += '<h2>' + esc(set.label) + '</h2>';
-      html += '<table border="1" style="border-collapse:collapse">' +
-        '<tr><th>#</th><th>Song</th><th>Key</th><th>Singer</th></tr>';
+      html += '<table style="width:100%;border-collapse:collapse;' +
+        'table-layout:fixed">' +
+        '<colgroup>' + DOC_COLS.map((w) =>
+          '<col style="width:' + w + 'px">').join('') + '</colgroup><tr>' +
+        ['#', 'Song', 'Key', 'Singer'].map((h, i) =>
+          '<th style="' + cellStyle(i) +
+          'text-align:left;background:#eef2f1">' + h + '</th>').join('') +
+        '</tr>';
       text += '\n' + set.label + '\n';
       let n = 0;
       for (const item of set.items) {
         if (item.brk) {
-          html += '<tr><td></td><td colspan="3"><i>' +
+          html += '<tr><td style="' + cellStyle(0) + '"></td>' +
+            '<td colspan="3" style="' + CELL + '"><i>' +
             esc(item.label || 'Break') +
             (item.minutes ? ' (' + item.minutes + ' min)' : '') +
             '</i></td></tr>';
@@ -530,13 +678,16 @@
         const song = songById(item.songId);
         if (!song) continue;
         n++;
+        const part = partFor(song, item);
         const note = song.note
           ? ' <i style="color:#5c6a66">' + esc(song.note) + '</i>' : '';
-        html += '<tr><td>' + n + '</td><td>' + songCellHtml(song, item) +
-          note + '</td><td><b>' + esc(song.key || '') + '</b></td><td>' +
-          esc(song.singer || '') + '</td></tr>';
-        text += n + '. ' + song.title + '  ' + (song.key || '') + '  ' +
-          (song.singer || '') + '\n';
+        html += '<tr><td style="' + cellStyle(0) + '">' + n + '</td>' +
+          '<td style="' + cellStyle(1) + '">' + songCellHtml(song, item) +
+          note + '</td><td style="' + cellStyle(2) + '"><b>' +
+          esc(part.key) + '</b></td><td style="' + cellStyle(3) + '">' +
+          esc(part.singer) + '</td></tr>';
+        text += n + '. ' + song.title + '  ' + part.key + '  ' +
+          part.singer + '\n';
       }
       html += '</table>';
     }
@@ -558,8 +709,9 @@
         }
         const song = songById(item.songId);
         if (!song) continue;
+        const part = partFor(song, item);
         rows.push({ song, item, cells: [set.label, ++n, song.title,
-          song.key, song.singer, song.note || ''] });
+          part.key, part.singer, song.note || ''] });
       }
     });
     const tsv = [header.join('\t')]
@@ -596,6 +748,7 @@
         incoming.library.length + ' songs, ' + incoming.docs.length +
         ' setlists")?')) return;
       state = incoming;
+      migrate();
       if (!state.docs.length) state.docs.push(defaultDoc());
       state.activeDocId = state.docs[0].id;
       save(); renderAll();
@@ -696,6 +849,7 @@
         }
         const song = songById(item.songId);
         if (!song) continue;
+        const part = partFor(song, item);
         ensureRoom(song.note ? 27 : 16);
         n++;
 
@@ -717,10 +871,10 @@
 
         pdf.setFont('helvetica', 'bold');
         pdf.setTextColor(...ink);
-        pdf.text(song.key || '', colKey, y);
+        pdf.text(part.key, colKey, y);
         pdf.setFont('helvetica', 'normal');
         pdf.setTextColor(...dim);
-        pdf.text(song.singer || '', colSinger, y);
+        pdf.text(part.singer, colSinger, y);
         pdf.setTextColor(...ink);
 
         if (song.note) {
@@ -815,14 +969,21 @@
     $('#libSearch').addEventListener('input', renderLibrary);
     $('#libAdd').addEventListener('click', () => openEditor(null));
 
+    $('#seAddPart').addEventListener('click', () => {
+      addPartRow().querySelector('.p-singer').focus();
+    });
     $('#seSave').addEventListener('click', saveEditor);
     $('#seCancel').addEventListener('click', closeEditor);
     $('#seDelete').addEventListener('click', deleteEditing);
     $('#songEditor').addEventListener('click', (e) => {
       if (e.target === $('#songEditor')) closeEditor();
     });
+    $('#spCancel').addEventListener('click', closePicker);
+    $('#singerPick').addEventListener('click', (e) => {
+      if (e.target === $('#singerPick')) closePicker();
+    });
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeEditor();
+      if (e.key === 'Escape') { closeEditor(); closePicker(); }
       if (e.key === 'Enter' &&
           !$('#songEditor').classList.contains('hidden') &&
           e.target.tagName === 'INPUT') saveEditor();

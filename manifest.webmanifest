@@ -1,7 +1,7 @@
 {
-  "name": "Setlist Studio",
+  "name": "Sugar Whiskey Setlist Manager",
   "short_name": "Setlists",
-  "description": "Build band setlists from your repertoire, drag them into order, export the sheet.",
+  "description": "The Sugar Whiskey Band setlist manager: build setlists from the repertoire, drag them into order, export the sheet.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",

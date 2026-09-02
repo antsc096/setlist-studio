@@ -4,22 +4,22 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0f4c44">
-<title>Setlist Studio</title>
+<title>Sugar Whiskey Setlist Manager</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
-<link rel="stylesheet" href="vendor/inter.css">
+<link rel="stylesheet" href="vendor/google-sans.css">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
+<div class="disclaimer">
+  Created by Anthony Collins for the sole use of The Sugar Whiskey Band.
+</div>
 <header class="appbar">
   <div class="brand">
-    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="2.6" rx="1.3" fill="currentColor"/>
-      <rect x="3" y="10.7" width="13" height="2.6" rx="1.3" fill="currentColor"/>
-      <rect x="3" y="17.4" width="16" height="2.6" rx="1.3" fill="currentColor"/>
-    </svg>
-    <span>Setlist Studio</span>
+    <img src="brand/sugar-whiskey.png" alt="The Sugar Whiskey Band"
+         width="216" height="102">
+    <span>Setlist Manager</span>
   </div>
   <div class="doc-controls">
     <select id="docPicker" title="Saved setlists"></select>
@@ -86,14 +86,29 @@
   <div class="sheet-card">
     <h2 id="seTitle">New song</h2>
     <label>Title <input id="seSongTitle" autocomplete="off"></label>
-    <label>Key <input id="seKey" autocomplete="off" placeholder="e.g. G, F#m, Bb"></label>
-    <label>Sung by <input id="seSinger" autocomplete="off"></label>
+    <div class="se-parts">
+      <div class="se-parts-label">Sung by <span>- one row per singer, each in their own key</span></div>
+      <div id="sePartList"></div>
+      <button id="seAddPart" class="add-part">+ Another singer</button>
+    </div>
     <label>Note <input id="seNote" autocomplete="off" placeholder="e.g. full step down"></label>
     <div class="sheet-actions">
       <button id="seDelete" class="ghost danger">Delete</button>
       <span class="grow"></span>
       <button id="seCancel" class="ghost">Cancel</button>
       <button id="seSave" class="primary">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="singerPick" class="sheet hidden">
+  <div class="sheet-card pick-card">
+    <h2>Who's singing?</h2>
+    <div class="pick-song" id="spSong"></div>
+    <div id="spList" class="pick-list"></div>
+    <div class="sheet-actions">
+      <span class="grow"></span>
+      <button id="spCancel" class="ghost">Cancel</button>
     </div>
   </div>
 </div>

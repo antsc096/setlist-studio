@@ -1,6 +1,7 @@
-/* Setlist Studio - a paper document with a song library beside it.
-   Inter (vendored), one deep-teal accent, soft layered surfaces; red is
-   reserved for "new song, learn this". Everything works offline. */
+/* Sugar Whiskey Setlist Manager - a paper document with a song library
+   beside it. Google Sans (vendored, so it still works with no network),
+   one deep-teal accent, soft layered surfaces; red is reserved for
+   "new song, learn this". */
 
 :root {
   --ink: #16211e;
@@ -28,7 +29,8 @@ body {
   margin: 0;
   background: var(--ground);
   color: var(--ink);
-  font: 14.5px/1.5 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font: 14.5px/1.5 'Google Sans', 'Product Sans', Roboto, -apple-system,
+    'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 button {
@@ -42,6 +44,13 @@ input[type="checkbox"] {
   width: 15px; height: 15px; cursor: pointer;
 }
 
+/* The band owns this thing; say so once, quietly, above everything else. */
+.disclaimer {
+  padding: 5px 16px; text-align: center;
+  font-size: 11px; letter-spacing: .01em; color: var(--ink-mute);
+  background: var(--well); border-bottom: 1px solid var(--line);
+}
+
 /* --- App bar ----------------------------------------------------------- */
 .appbar {
   position: sticky; top: 0; z-index: 30;
@@ -53,9 +62,15 @@ input[type="checkbox"] {
   border-bottom: 1px solid var(--line);
   flex-wrap: wrap;
 }
-.brand {
-  display: flex; align-items: center; gap: 9px;
-  font-weight: 650; letter-spacing: -.01em; color: var(--accent-deep);
+.brand { display: flex; align-items: center; gap: 11px; }
+.brand img {
+  display: block; height: 44px; width: auto;
+}
+/* A hairline between the band's mark and what this app is. */
+.brand span {
+  padding-left: 11px; border-left: 1px solid var(--line-strong);
+  font-size: 14px; font-weight: 550; letter-spacing: -.01em;
+  color: var(--ink-dim); white-space: nowrap;
 }
 .doc-controls, .exports { display: flex; align-items: center; gap: 7px; }
 .exports { margin-left: auto; }
@@ -352,6 +367,72 @@ button.ghost.wide:hover {
   outline: none; border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+/* One row per singer: a name, the key they take it in, and a way out. */
+.se-parts { margin-bottom: 11px; }
+.se-parts-label {
+  font-size: 11px; font-weight: 600; color: var(--ink-mute);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px;
+}
+.se-parts-label span {
+  text-transform: none; letter-spacing: 0; font-weight: 450;
+}
+.part-row { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.part-row input {
+  padding: 9px 12px; border: 1px solid var(--line-strong);
+  border-radius: 9px; font-size: 14.5px; font-weight: 450; min-width: 0;
+}
+.part-row .p-singer { flex: 1; }
+.part-row .p-key {
+  width: 90px; flex: none; text-align: center; font-weight: 600;
+}
+.part-row input:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.part-row .p-rm {
+  border: none; background: none; color: var(--ink-mute); flex: none;
+  padding: 6px 8px; border-radius: 7px;
+}
+.part-row .p-rm:hover { color: var(--new); background: var(--new-soft); }
+.add-part {
+  width: 100%; border: 1.5px dashed var(--line-strong); background: none;
+  color: var(--ink-dim); padding: 8px; border-radius: 9px;
+  font-weight: 550; font-size: 13px;
+}
+.add-part:hover {
+  color: var(--accent-deep); border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* --- "Who's singing?" ---------------------------------------------------- */
+.pick-card { max-width: 340px; }
+.pick-song { color: var(--ink-dim); font-size: 13.5px; margin: -8px 0 13px; }
+.pick-list { display: flex; flex-direction: column; gap: 7px; }
+.pick {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: 1px solid var(--line-strong); background: var(--paper);
+  border-radius: 10px; padding: 12px 14px; text-align: left;
+}
+.pick:hover { border-color: var(--accent); background: var(--accent-soft); }
+.pick .pick-singer { flex: 1; font-weight: 550; }
+.pick .pick-key {
+  font-weight: 700; font-size: 13px; background: var(--well);
+  border-radius: 6px; padding: 3px 10px;
+}
+.pick:hover .pick-key { background: var(--paper); }
+
+/* A song with more than one singer: the key chip carries a faint outline to
+   say it can be tapped, which is the only affordance left on a phone where
+   the singer column is hidden. */
+.entry .key.pickable, .entry .singer.pickable { cursor: pointer; }
+.entry .key.pickable { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.entry .key.pickable:hover {
+  background: var(--accent-soft); color: var(--accent-deep);
+}
+.entry .singer.pickable:hover {
+  color: var(--accent-deep); text-decoration: underline;
+}
+
 .sheet-actions { display: flex; gap: 8px; margin-top: 16px; align-items: center; }
 .sheet-actions .grow { flex: 1; }
 .sheet-actions .primary {
@@ -403,16 +484,23 @@ button.ghost.wide:hover {
   .fab:active { transform: scale(.97); }
   .appbar { gap: 8px; padding: 10px 12px; }
   .exports { margin-left: 0; }
+  .disclaimer { padding: 5px 10px; font-size: 10.5px; }
+  .brand img { height: 30px; }
+  .brand span { font-size: 13px; padding-left: 9px; }
 }
 
 /* --- Print: the paper is the page --------------------------------------- */
 @media print {
   body { background: #fff; }
-  .appbar, .library, .fab, .scaffold, #addSet, .menu,
+  .appbar, .library, .fab, .scaffold, #addSet, .menu, .disclaimer,
   .entry .grip, .entry .rm, .entry .flags, .set-tools { display: none !important; }
   main { display: block; padding: 0; max-width: none; }
   .paper { border: none; box-shadow: none; padding: 0; }
   .entry:hover { background: none; }
   .entry .key { background: none; }
   .set { break-inside: avoid-page; }
+  /* The phone layout drops the singer to save width, and that media query
+     is still in force when a phone prints. On paper there is always room,
+     so put it back or the printed sheet loses a whole column. */
+  .entry .singer { display: block !important; width: auto; min-width: 66px; }
 }
