@@ -22,7 +22,6 @@ const DEFAULT_TEMPLATE = [
     { brk: 'Dinner break', minutes: 30 },
   ] },
   { label: 'SET 2', items: [
-    { title: 'First Dance', singer: 'Chris' },
     { title: 'Crazy Little Thing Called Love', singer: 'Chris' },
     { title: 'Stuck In The Middle', singer: 'Chris' },
     { title: 'Folsom Prison', singer: 'Chris' },

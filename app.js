@@ -11,7 +11,7 @@
 
   // Who turns up. Every name field offers these instead of typing, and
   // anyone typed in who is not on the list joins it.
-  const DEFAULT_CREW = ['Ants', 'Ris', 'Jord', 'Adam', 'Church', 'Chris',
+  const DEFAULT_CREW = ['Ant', 'Ris', 'Jord', 'Adam', 'Church', 'Chris',
     'Haley', 'Jerry'];
   const NAME_FIELDS = ['hCrew', 'hSound', 'hContact', 'hMc'];
 
@@ -97,6 +97,23 @@
   function migrate() {
     if (!state || !Array.isArray(state.library)) return;
     if (!Array.isArray(state.crew)) state.crew = DEFAULT_CREW.slice();
+    // The template used to carry a "First Dance" placeholder song. The
+    // first dance is a mark on a real song now, so the stray library entry
+    // and any line pointing at it go. Once per device, never again.
+    if (!state.droppedFirstDancePlaceholder) {
+      state.droppedFirstDancePlaceholder = true;
+      const stray = state.library.filter(
+        (s) => s.title === 'First Dance' && !s.parts.length);
+      for (const gone of stray) {
+        state.library = state.library.filter((s) => s !== gone);
+        for (const d of (state.docs || [])) {
+          for (const set of (d.sets || [])) {
+            set.items = set.items.filter(
+              (i) => i.brk || i.songId !== gone.id);
+          }
+        }
+      }
+    }
     for (const song of state.library) {
       if (!Array.isArray(song.parts)) {
         song.parts = (song.singer || song.key)
@@ -288,13 +305,16 @@
     const song = songById(item.songId);
     const li = el('li', 'entry' +
       ((song && song.isNew) ? ' is-new' : '') +
-      (item.requested ? ' requested' : ''));
+      (item.requested ? ' requested' : '') +
+      (item.firstDance ? ' first-dance' : ''));
 
     li.appendChild(el('span', 'num', number + '.'));
     li.appendChild(el('span', 'grip', '⋮⋮'));
 
     const body = el('div', 'song');
-    const title = el('div', 'title' + (item.requested ? ' requested' : ''),
+    const title = el('div', 'title' +
+      (item.requested ? ' requested' : '') +
+      (item.firstDance ? ' first-dance' : ''),
       song ? song.title : '(deleted song)');
     body.appendChild(title);
     if (song && song.note) body.appendChild(el('div', 'note', song.note));
@@ -331,6 +351,19 @@
     reqL.appendChild(document.createTextNode('req'));
     reqL.title = 'Requested by the couple';
     flags.appendChild(reqL);
+
+    const danceL = el('label', 'dance-l');
+    const dance = el('input');
+    dance.type = 'checkbox';
+    dance.checked = !!item.firstDance;
+    dance.addEventListener('change', () => {
+      item.firstDance = dance.checked;
+      save(); renderSets();
+    });
+    danceL.appendChild(dance);
+    danceL.appendChild(document.createTextNode('1st'));
+    danceL.title = 'Played as the first dance';
+    flags.appendChild(danceL);
 
     const newL = el('label');
     const nw = el('input');
@@ -784,10 +817,15 @@
 
   function songCellHtml(song, item) {
     let t = esc(song.title);
-    if (item.requested) t = '<b>' + t + '</b>';
-    if (song.isNew) t = '<span style="color:#c22c2c">' + t + '</span>';
+    if (item.requested || item.firstDance) t = '<b>' + t + '</b>';
+    if (item.firstDance) t = '<span style="color:#7a3fb8">' + t + '</span>';
+    else if (song.isNew) t = '<span style="color:#c22c2c">' + t + '</span>';
     return t;
   }
+
+  // Colour does not survive a paste into a plain-text field, so the text
+  // flavour of every export says it in words.
+  const danceTag = (item) => (item.firstDance ? ' (first dance)' : '');
 
   // Google Docs sizes a pasted table to its contents, so a table of short
   // song titles ends up as a narrow strip floating on the page. Declaring a
@@ -849,8 +887,8 @@
           note + '</td><td style="' + cellStyle(2) + '"><b>' +
           esc(part.key) + '</b></td><td style="' + cellStyle(3) + '">' +
           esc(part.singer) + '</td></tr>';
-        text += n + '. ' + song.title + '  ' + part.key + '  ' +
-          part.singer + '\n';
+        text += n + '. ' + song.title + danceTag(item) + '  ' +
+          part.key + '  ' + part.singer + '\n';
       }
       html += '</table>';
     }
@@ -873,7 +911,8 @@
         const song = songById(item.songId);
         if (!song) continue;
         const part = partFor(song, item);
-        rows.push({ song, item, cells: [set.label, ++n, song.title,
+        rows.push({ song, item, cells: [set.label, ++n,
+          song.title + danceTag(item),
           part.key, part.singer, song.note || ''] });
       }
     });
@@ -936,6 +975,7 @@
     const ink = [29, 39, 36];
     const dim = [92, 106, 102];
     const red = [194, 44, 44];
+    const purple = [122, 63, 184];
 
     const ensureRoom = (needed) => {
       if (y + needed > pageH - margin) { pdf.addPage(); y = margin; }
@@ -985,6 +1025,7 @@
     }
 
     let anyRequested = false;
+    let anyDance = false;
     for (const set of d.sets) {
       ensureRoom(46);
       y += 18;
@@ -1020,10 +1061,12 @@
         pdf.setTextColor(...dim);
         pdf.text(String(n), margin + 14, y, { align: 'right' });
 
-        if (song.isNew) pdf.setTextColor(...red);
+        if (item.firstDance) pdf.setTextColor(...purple);
+        else if (song.isNew) pdf.setTextColor(...red);
         else pdf.setTextColor(...ink);
-        const bold = song.isNew || item.requested;
+        const bold = song.isNew || item.requested || item.firstDance;
         if (item.requested) anyRequested = true;
+        if (item.firstDance) anyDance = true;
         pdf.setFont('helvetica', bold ? 'bold' : 'normal');
         const maxTitleW = colKey - 12 - (margin + 22);
         let title = song.title;
@@ -1060,6 +1103,7 @@
     pdf.setTextColor(...dim);
     const legend = [];
     if (anyRequested) legend.push('bold = requested by the couple');
+    if (anyDance) legend.push('purple = first dance');
     if (state.library.some((s) => s.isNew &&
         d.sets.some((set) => set.items.some((i) => i.songId === s.id)))) {
       legend.push('red = new song');
