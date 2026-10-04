@@ -578,6 +578,11 @@
     placeSong(song, song.parts.length ? song.parts[0].id : '');
   }
 
+  // A PLEASE PLAY from the couple IS a request: any line it lands on
+  // starts with req already ticked.
+  const pleaseFor = (d, songId) =>
+    (d.clientVerdicts || {})[songId] === 'please';
+
   function placeSong(song, partId) {
     const d = doc();
     if (!d.sets.length) {
@@ -585,7 +590,7 @@
       d.numSets = 1;
     }
     d.sets[d.activeSet].items.push({
-      songId: song.id, partId, requested: false,
+      songId: song.id, partId, requested: pleaseFor(d, song.id),
     });
     save(); renderSets(); renderLibrary();
   }
@@ -831,7 +836,7 @@
           song.parts.find((p) => sameName(p.singer, entry.singer))) ||
           song.parts[0];
         return { songId: song.id, partId: part ? part.id : '',
-          requested: false };
+          requested: pleaseFor(d, song.id) };
       }),
     }));
     d.numSets = d.sets.length;
@@ -922,10 +927,24 @@
     d.clientVerdicts = verdicts;
     d.clientPicksFrom = data.couple || '';
     d.clientPicksWhen = Date.now();
+    // Lines already on the setlist catch up: a PLEASE PLAY ticks req.
+    // Nothing is ever unticked - a request made in person stays made.
+    let ticked = 0;
+    for (const set of d.sets) {
+      for (const item of set.items) {
+        if (item.brk || item.noteRow) continue;
+        if (verdicts[item.songId] === 'please' && !item.requested) {
+          item.requested = true;
+          ticked++;
+        }
+      }
+    }
     state.activeDocId = d.id;
     save(); renderAll();
     toast('Picks from ' + (data.couple || 'the couple') + ': ' +
       data.please.length + ' PLEASE PLAY, ' + data.no.length + ' HECK NO.' +
+      (ticked ? ' ' + ticked + ' setlist line' + (ticked === 1 ? '' : 's') +
+        ' ticked req.' : '') +
       (missed ? ' ' + missed + ' song' + (missed === 1 ? '' : 's') +
         ' not in the library skipped.' : ''));
   }

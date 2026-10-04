@@ -81,6 +81,10 @@ a server, or anything to install. The links themselves carry the data:
 
 Notes on how it behaves:
 
+- A PLEASE PLAY counts as a request: importing picks ticks **req** on
+  any matching line already on the setlist, and a please-play song
+  added later (by tap or by the template) arrives with req ticked.
+  Nothing is ever unticked automatically.
 - Verdicts belong to the gig, not the library: two gigs in flight keep
   separate picks, and duplicating a setlist does not carry them over.
 - A second reply from the same couple replaces the first wholesale.
