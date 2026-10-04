@@ -313,6 +313,25 @@
 
       host.appendChild(section);
     });
+
+    // The legend earns its place only when a marked song is on the list,
+    // and then names only the marks in use - same rule as the PDF's.
+    let anyReq = false;
+    let anyDance = false;
+    let anyNew = false;
+    for (const set of d.sets) {
+      for (const item of set.items) {
+        if (item.brk || item.noteRow) continue;
+        if (item.requested) anyReq = true;
+        if (item.firstDance) anyDance = true;
+        const song = songById(item.songId);
+        if (song && song.isNew) anyNew = true;
+      }
+    }
+    $('#lgReq').classList.toggle('hidden', !anyReq);
+    $('#lgDance').classList.toggle('hidden', !anyDance);
+    $('#lgNew').classList.toggle('hidden', !anyNew);
+    $('#legend').classList.toggle('hidden', !(anyReq || anyDance || anyNew));
   }
 
   function renderEntry(set, item, itemIndex, number, setIndex) {
@@ -1025,6 +1044,9 @@
       html += '<p>' + esc(d.header.notes).replace(/\n/g, '<br>') + '</p>';
     }
     let text = (d.header.couple || 'Setlist') + '\n';
+    let anyRequested = false;
+    let anyDance = false;
+    let anyNew = false;
     for (const set of d.sets) {
       html += '<h2>' + esc(set.label) + '</h2>';
       text += '\n' + set.label + '\n';
@@ -1074,6 +1096,9 @@
         const song = songById(item.songId);
         if (!song) continue;
         n++;
+        if (item.requested) anyRequested = true;
+        if (item.firstDance) anyDance = true;
+        if (song.isNew) anyNew = true;
         const part = partFor(song, item);
         const noteText = [song.note, item.note].filter(Boolean).join(' · ');
         const note = noteText
@@ -1087,6 +1112,21 @@
           part.key + '  ' + part.singer + '\n';
       }
       closeTable();
+    }
+    // The same legend the PDF prints, so the artist reading the pasted
+    // doc knows what the colours and bold mean.
+    const legend = [];
+    if (anyRequested) legend.push('<b>bold</b> = requested by the couple');
+    if (anyDance) {
+      legend.push('<span style="color:#7a3fb8">purple</span> = first dance');
+    }
+    if (anyNew) {
+      legend.push('<span style="color:#c22c2c">red</span> = new song');
+    }
+    if (legend.length) {
+      html += '<p style="font-size:10px;color:#5c6a66"><i>' +
+        legend.join(' &nbsp;·&nbsp; ') + '</i></p>';
+      text += '\n' + legend.join(' · ').replace(/<[^>]+>/g, '') + '\n';
     }
     writeClipboard(html, text,
       () => toast('Copied. Paste straight into a Google Doc.'));

@@ -48,8 +48,11 @@ Each installed copy keeps its own data, so send the band the link and use
 - Tick **requested by the couple** on a line, **first dance** on the song
   the couple dance to, or **new song** on a song. First dance shows purple
   and bold, new songs red everywhere so the band can see what to learn.
-  All three carry through to the PDF and both copy formats, and a
-  legend at the foot of the document says what the colours mean.
+  All three carry through to the PDF and both copy formats. So the
+  artist reading it knows what the colours and bold mean, the PDF,
+  the Docs copy, the printed page and the document itself all end
+  with a legend - shown only when a marked song is on the list, and
+  naming only the marks in use.
 - **Load default template** fills the document with the band's usual four
   sets plus the extras bench, in one click. Most gigs are a variation on
   it. Songs are matched to the library by title and any the library has

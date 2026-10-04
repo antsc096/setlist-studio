@@ -635,7 +635,7 @@ button.ghost.wide:hover {
 @media print {
   body { background: #fff; }
   .appbar, .library, .fab, .scaffold, #addSet, .menu, .disclaimer,
-  .crew-bar, .verdict, #updateBar, .legend,
+  .crew-bar, .verdict, #updateBar,
   .entry .grip, .entry .rm, .entry .flags, .set-tools { display: none !important; }
   main { display: block; padding: 0; max-width: none; }
   .paper { border: none; box-shadow: none; padding: 0; }

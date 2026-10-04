@@ -1,7 +1,7 @@
 /* Offline is the product: after one visit, everything is served from this
    cache. Bump the version string whenever any file changes, or installed
    copies keep the old app forever. */
-const CACHE = 'setlist-studio-v12';
+const CACHE = 'setlist-studio-v13';
 const ASSETS = [
   './',
   'index.html',
