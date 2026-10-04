@@ -38,7 +38,8 @@ Each installed copy keeps its own data, so send the band the link and use
   date, crew, sound, point of contact, MC, run-sheet notes), any number of
   sets with a songs-per-set guide, breaks with lengths, free **note
   lines** between songs ("speeches here") added like breaks, and
-  drag-to-reorder across sets.
+  drag-to-reorder across sets. In the Docs copy, note lines sit between
+  the tables as their own paragraphs, never inside them.
 - Two kinds of song note: the song's own note ("full step down") shows
   on every setlist, and a **note for this setlist only** ("cut it short
   tonight"), entered by tapping the song on a set line, stays with that

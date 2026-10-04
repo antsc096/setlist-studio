@@ -1027,17 +1027,41 @@
     let text = (d.header.couple || 'Setlist') + '\n';
     for (const set of d.sets) {
       html += '<h2>' + esc(set.label) + '</h2>';
-      html += '<table style="width:100%;border-collapse:collapse;' +
-        'table-layout:fixed">' +
-        '<colgroup>' + DOC_COLS.map((w) =>
-          '<col style="width:' + w + 'px">').join('') + '</colgroup><tr>' +
-        ['#', 'Song', 'Key', 'Singer'].map((h, i) =>
-          '<th style="' + cellStyle(i) +
-          'text-align:left;background:#eef2f1">' + h + '</th>').join('') +
-        '</tr>';
       text += '\n' + set.label + '\n';
+      // Note lines live between the tables, never inside them: the table
+      // closes at a note, the note stands as its own paragraph, and a
+      // fresh table (same columns, no repeated header) picks the songs
+      // back up after it.
+      let tableOpen = false;
+      let headerDone = false;
+      const openTable = () => {
+        html += '<table style="width:100%;border-collapse:collapse;' +
+          'table-layout:fixed">' +
+          '<colgroup>' + DOC_COLS.map((w) =>
+            '<col style="width:' + w + 'px">').join('') + '</colgroup>';
+        if (!headerDone) {
+          html += '<tr>' + ['#', 'Song', 'Key', 'Singer'].map((h, i) =>
+            '<th style="' + cellStyle(i) +
+            'text-align:left;background:#eef2f1">' + h + '</th>').join('') +
+            '</tr>';
+          headerDone = true;
+        }
+        tableOpen = true;
+      };
+      const closeTable = () => {
+        if (tableOpen) { html += '</table>'; tableOpen = false; }
+      };
       let n = 0;
       for (const item of set.items) {
+        if (item.noteRow) {
+          if (!item.text) continue;
+          closeTable();
+          html += '<p style="margin:6px 0"><i style="color:#5c6a66">' +
+            esc(item.text) + '</i></p>';
+          text += '- ' + item.text + '\n';
+          continue;
+        }
+        if (!tableOpen) openTable();
         if (item.brk) {
           html += '<tr><td style="' + cellStyle(0) + '"></td>' +
             '<td colspan="3" style="' + CELL + '"><i>' +
@@ -1045,14 +1069,6 @@
             (item.minutes ? ' (' + item.minutes + ' min)' : '') +
             '</i></td></tr>';
           text += '- ' + (item.label || 'Break') + '\n';
-          continue;
-        }
-        if (item.noteRow) {
-          if (!item.text) continue;
-          html += '<tr><td style="' + cellStyle(0) + '"></td>' +
-            '<td colspan="3" style="' + CELL + '"><i>' +
-            esc(item.text) + '</i></td></tr>';
-          text += '- ' + item.text + '\n';
           continue;
         }
         const song = songById(item.songId);
@@ -1070,7 +1086,7 @@
         text += n + '. ' + song.title + danceTag(item) + '  ' +
           part.key + '  ' + part.singer + '\n';
       }
-      html += '</table>';
+      closeTable();
     }
     writeClipboard(html, text,
       () => toast('Copied. Paste straight into a Google Doc.'));
