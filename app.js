@@ -243,7 +243,7 @@
       label.addEventListener('focus', () => setActiveSet(setIndex, false));
       head.appendChild(label);
 
-      const songCount = set.items.filter((i) => !i.brk).length;
+      const songCount = set.items.filter((i) => !i.brk && !i.noteRow).length;
       const count = el('span',
         'set-count' + (songCount > d.songsPerSet ? ' over' : ''),
         songCount + ' / ' + d.songsPerSet);
@@ -258,6 +258,14 @@
         save(); renderSets();
       });
       tools.appendChild(addBreak);
+      const addNote = el('button', null, '+ note');
+      addNote.title = 'Add a note line to this set';
+      addNote.addEventListener('click', () => {
+        set.items.push({ noteRow: true, text: '' });
+        setActiveSet(setIndex, false);
+        save(); renderSets();
+      });
+      tools.appendChild(addNote);
       const rmSet = el('button', null, '✕');
       rmSet.title = 'Remove this set';
       rmSet.addEventListener('click', () => {
@@ -284,8 +292,8 @@
 
       let number = 0;
       set.items.forEach((item, itemIndex) => {
-        list.appendChild(item.brk
-          ? renderBreak(set, item, itemIndex)
+        list.appendChild(item.brk ? renderBreak(set, item, itemIndex)
+          : item.noteRow ? renderNoteRow(set, item, itemIndex)
           : renderEntry(set, item, itemIndex, ++number, setIndex));
       });
       section.appendChild(list);
@@ -323,14 +331,28 @@
       (item.firstDance ? ' first-dance' : ''),
       song ? song.title : '(deleted song)');
     body.appendChild(title);
-    if (song && song.note) body.appendChild(el('div', 'note', song.note));
+    // The song's own note shows on every setlist; the line's note belongs
+    // to this one alone and wears the accent to say so.
+    if ((song && song.note) || item.note) {
+      const noteLine = el('div', 'note');
+      if (song && song.note) {
+        noteLine.appendChild(el('span', null, song.note));
+      }
+      if (item.note) {
+        if (song && song.note) {
+          noteLine.appendChild(document.createTextNode(' · '));
+        }
+        noteLine.appendChild(el('span', 'doc-note', item.note));
+      }
+      body.appendChild(noteLine);
+    }
     const verdict = (doc().clientVerdicts || {})[item.songId];
     if (verdict) {
       body.appendChild(el('div',
         'verdict verdict-line ' + (verdict === 'please' ? 'please' : 'veto'),
         verdict === 'please' ? 'PLEASE PLAY' : 'HECK NO'));
     }
-    body.addEventListener('click', () => { if (song) openEditor(song); });
+    body.addEventListener('click', () => { if (song) openEditor(song, item); });
     li.appendChild(body);
 
     const part = partFor(song, item);
@@ -435,6 +457,29 @@
     return li;
   }
 
+  // A free line among the songs - "speeches here", "cake cut after this" -
+  // dragged around exactly like a break, carried through to every export.
+  function renderNoteRow(set, item, itemIndex) {
+    const li = el('li', 'entry note-row');
+    li.appendChild(el('span', 'num', '✎'));
+    li.appendChild(el('span', 'grip', '⋮⋮'));
+
+    const text = el('input', 'n-text');
+    text.value = item.text || '';
+    text.placeholder = 'Note for the band…';
+    text.addEventListener('input', () => { item.text = text.value; save(); });
+    li.appendChild(text);
+
+    const rm = el('button', 'rm', '✕');
+    rm.title = 'Remove this note';
+    rm.addEventListener('click', () => {
+      set.items.splice(itemIndex, 1);
+      save(); renderSets();
+    });
+    li.appendChild(rm);
+    return li;
+  }
+
   function setActiveSet(index, rerender) {
     if (doc().activeSet === index) return;
     doc().activeSet = index;
@@ -454,7 +499,9 @@
     const inDoc = new Map();
     for (const set of doc().sets) {
       for (const item of set.items) {
-        if (!item.brk) inDoc.set(item.songId, (inDoc.get(item.songId) || 0) + 1);
+        if (item.songId) {
+          inDoc.set(item.songId, (inDoc.get(item.songId) || 0) + 1);
+        }
       }
     }
 
@@ -547,9 +594,11 @@
   // --- Song editor sheet ---------------------------------------------------
 
   let editing = null; // null = closed, {} without id = new song
+  let editingItem = null; // the setlist line the editor was opened from
 
-  function openEditor(song) {
+  function openEditor(song, item) {
     editing = song || null;
+    editingItem = item || null;
     $('#seTitle').textContent = song ? 'Edit song' : 'New song';
     $('#seSongTitle').value = song ? song.title : '';
     $('#sePartList').innerHTML = '';
@@ -557,6 +606,10 @@
     if (parts.length) parts.forEach(addPartRow);
     else addPartRow();
     $('#seNote').value = song ? song.note : '';
+    // Opened from a setlist line, the editor also carries that line's
+    // own note; opened from the library there is no line to carry it.
+    $('#seDocNoteWrap').classList.toggle('hidden', !editingItem);
+    $('#seDocNote').value = editingItem ? (editingItem.note || '') : '';
     $('#seDelete').classList.toggle('hidden', !song);
     $('#songEditor').classList.remove('hidden');
     $('#seSongTitle').focus();
@@ -592,6 +645,7 @@
 
   function closeEditor() {
     $('#songEditor').classList.add('hidden');
+    editingItem = null;
   }
 
   function saveEditor() {
@@ -607,6 +661,11 @@
     const values = { title, parts, note: $('#seNote').value.trim() };
     if (editing) Object.assign(editing, values);
     else state.library.push(Object.assign({ id: uid(), isNew: false }, values));
+    if (editingItem) {
+      const docNote = $('#seDocNote').value.trim();
+      if (docNote) editingItem.note = docNote;
+      else delete editingItem.note;
+    }
     save(); closeEditor(); renderAll();
   }
 
@@ -988,12 +1047,21 @@
           text += '- ' + (item.label || 'Break') + '\n';
           continue;
         }
+        if (item.noteRow) {
+          if (!item.text) continue;
+          html += '<tr><td style="' + cellStyle(0) + '"></td>' +
+            '<td colspan="3" style="' + CELL + '"><i>' +
+            esc(item.text) + '</i></td></tr>';
+          text += '- ' + item.text + '\n';
+          continue;
+        }
         const song = songById(item.songId);
         if (!song) continue;
         n++;
         const part = partFor(song, item);
-        const note = song.note
-          ? ' <i style="color:#5c6a66">' + esc(song.note) + '</i>' : '';
+        const noteText = [song.note, item.note].filter(Boolean).join(' · ');
+        const note = noteText
+          ? ' <i style="color:#5c6a66">' + esc(noteText) + '</i>' : '';
         html += '<tr><td style="' + cellStyle(0) + '">' + n + '</td>' +
           '<td style="' + cellStyle(1) + '">' + songCellHtml(song, item) +
           note + '</td><td style="' + cellStyle(2) + '"><b>' +
@@ -1020,12 +1088,19 @@
             '', '', item.minutes ? item.minutes + ' min' : ''] });
           continue;
         }
+        if (item.noteRow) {
+          if (item.text) {
+            rows.push({ cells: [set.label, '', item.text, '', '', ''] });
+          }
+          continue;
+        }
         const song = songById(item.songId);
         if (!song) continue;
         const part = partFor(song, item);
         rows.push({ song, item, cells: [set.label, ++n,
           song.title + danceTag(item),
-          part.key, part.singer, song.note || ''] });
+          part.key, part.singer,
+          [song.note, item.note].filter(Boolean).join(' · ')] });
       }
     });
     const tsv = [header.join('\t')]
@@ -1163,10 +1238,26 @@
           y += 15;
           continue;
         }
+        if (item.noteRow) {
+          if (!item.text) continue;
+          pdf.setFont('helvetica', 'italic');
+          pdf.setTextColor(...dim);
+          const noteLines =
+            pdf.splitTextToSize(item.text, pageW - margin * 2 - 22);
+          for (const line of noteLines) {
+            ensureRoom(16);
+            pdf.text(line, margin + 22, y);
+            y += 13;
+          }
+          pdf.setTextColor(...ink);
+          y += 2;
+          continue;
+        }
         const song = songById(item.songId);
         if (!song) continue;
         const part = partFor(song, item);
-        ensureRoom(song.note ? 27 : 16);
+        const lineNote = [song.note, item.note].filter(Boolean).join(' · ');
+        ensureRoom(lineNote ? 27 : 16);
         n++;
 
         pdf.setFont('helvetica', 'normal');
@@ -1195,12 +1286,12 @@
         pdf.text(part.singer, colSinger, y);
         pdf.setTextColor(...ink);
 
-        if (song.note) {
+        if (lineNote) {
           y += 11;
           pdf.setFont('helvetica', 'italic');
           pdf.setFontSize(9);
           pdf.setTextColor(...dim);
-          pdf.text(song.note, margin + 22, y);
+          pdf.text(lineNote, margin + 22, y);
           pdf.setFontSize(11);
           pdf.setTextColor(...ink);
         }

@@ -86,6 +86,11 @@
 
       <div id="sets"></div>
       <button id="addSet" class="ghost wide">+ Add another set</button>
+      <div class="legend">
+        <span><span class="lg-req">bold</span> requested by the couple</span>
+        <span><span class="lg-dance">purple</span> first dance</span>
+        <span><span class="lg-new">red</span> new song - learn it</span>
+      </div>
     </div>
   </section>
 </main>
@@ -101,7 +106,9 @@
       <div id="sePartList"></div>
       <button id="seAddPart" class="add-part">+ Another singer</button>
     </div>
-    <label>Note <input id="seNote" autocomplete="off" placeholder="e.g. full step down"></label>
+    <label>Note - every setlist <input id="seNote" autocomplete="off" placeholder="e.g. full step down"></label>
+    <label id="seDocNoteWrap" class="hidden">Note - this setlist only
+      <input id="seDocNote" autocomplete="off" placeholder="e.g. cut it short tonight"></label>
     <div class="sheet-actions">
       <button id="seDelete" class="ghost danger">Delete</button>
       <span class="grow"></span>

@@ -36,12 +36,19 @@ Each installed copy keeps its own data, so send the band the link and use
   on a line already in a set to swap singer.
 - The **setlist document** on the right: event header (couple, venue,
   date, crew, sound, point of contact, MC, run-sheet notes), any number of
-  sets with a songs-per-set guide, breaks with lengths, and drag-to-reorder
-  across sets.
+  sets with a songs-per-set guide, breaks with lengths, free **note
+  lines** between songs ("speeches here") added like breaks, and
+  drag-to-reorder across sets.
+- Two kinds of song note: the song's own note ("full step down") shows
+  on every setlist, and a **note for this setlist only** ("cut it short
+  tonight"), entered by tapping the song on a set line, stays with that
+  gig and shows in the accent colour. Both carry into the PDF and both
+  copy formats.
 - Tick **requested by the couple** on a line, **first dance** on the song
   the couple dance to, or **new song** on a song. First dance shows purple
   and bold, new songs red everywhere so the band can see what to learn.
-  All three carry through to the PDF and both copy formats.
+  All three carry through to the PDF and both copy formats, and a
+  legend at the foot of the document says what the colours mean.
 - **Load default template** fills the document with the band's usual four
   sets plus the extras bench, in one click. Most gigs are a variation on
   it. Songs are matched to the library by title and any the library has

@@ -386,6 +386,20 @@ main > * { min-width: 0; }
 .entry:hover .rm { opacity: 1; }
 .entry .rm:hover { color: var(--new); background: var(--new-soft); }
 
+/* A note the song carries on this setlist only. */
+.entry .note .doc-note { color: var(--accent-deep); font-weight: 550; }
+
+/* A free note line among the songs, sibling to a break. */
+.entry.note-row { font-style: italic; }
+.entry.note-row .num { color: var(--accent); font-style: normal; }
+.entry.note-row .n-text {
+  flex: 1; min-width: 0; border: none; outline: none; font: inherit;
+  color: var(--accent-deep); background: transparent;
+  border-bottom: 1px dashed transparent;
+}
+.entry.note-row .n-text:focus { border-bottom-color: var(--accent); }
+.entry.note-row .n-text::placeholder { color: var(--ink-mute); }
+
 .entry.break-row { color: var(--ink-dim); font-style: italic; }
 .entry.break-row .b-label {
   flex: 1; min-width: 0; border: none; outline: none; font: inherit;
@@ -401,6 +415,16 @@ main > * { min-width: 0; }
 .sortable-drag {
   background: var(--paper); box-shadow: var(--shadow-2); border-radius: 8px;
 }
+
+/* What the colours mean - the same legend the PDF prints. */
+.legend {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--line);
+  font-size: 11.5px; color: var(--ink-mute);
+}
+.legend .lg-req { font-weight: 750; color: var(--ink); }
+.legend .lg-dance { font-weight: 700; color: var(--dance); }
+.legend .lg-new { font-weight: 650; color: var(--new); }
 
 .wide { width: 100%; margin-top: 18px; }
 button.ghost.wide {
@@ -611,7 +635,7 @@ button.ghost.wide:hover {
 @media print {
   body { background: #fff; }
   .appbar, .library, .fab, .scaffold, #addSet, .menu, .disclaimer,
-  .crew-bar, .verdict, #updateBar,
+  .crew-bar, .verdict, #updateBar, .legend,
   .entry .grip, .entry .rm, .entry .flags, .set-tools { display: none !important; }
   main { display: block; padding: 0; max-width: none; }
   .paper { border: none; box-shadow: none; padding: 0; }
