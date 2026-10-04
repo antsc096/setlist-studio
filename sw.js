@@ -1,7 +1,7 @@
 /* Offline is the product: after one visit, everything is served from this
    cache. Bump the version string whenever any file changes, or installed
    copies keep the old app forever. */
-const CACHE = 'setlist-studio-v9';
+const CACHE = 'setlist-studio-v10';
 const ASSETS = [
   './',
   'index.html',
@@ -11,6 +11,7 @@ const ASSETS = [
   'template.js',
   'manifest.webmanifest',
   'vendor/sortable.min.js',
+  'vendor/lz-string.min.js',
   'vendor/google-sans.css',
   'vendor/google-sans-latin.woff2',
   'brand/sugar-whiskey.png',

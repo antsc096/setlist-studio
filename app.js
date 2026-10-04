@@ -9,6 +9,12 @@
 
   const STORE_KEY = 'setlist-studio.v1';
 
+  // Where the couple-facing song picks page lives. When the band's domain
+  // is wired up, switch this to https://requests.thesugarwhiskey.com/ (the
+  // README has the checklist) and bump the service worker cache version.
+  const REQUEST_PAGE_URL =
+    'https://antsc096.github.io/setlist-studio/request/';
+
   // Who turns up. Every name field offers these instead of typing, and
   // anyone typed in who is not on the list joins it.
   const DEFAULT_CREW = ['Ant', 'Ris', 'Jord', 'Adam', 'Church', 'Chris',
@@ -318,6 +324,12 @@
       song ? song.title : '(deleted song)');
     body.appendChild(title);
     if (song && song.note) body.appendChild(el('div', 'note', song.note));
+    const verdict = (doc().clientVerdicts || {})[item.songId];
+    if (verdict) {
+      body.appendChild(el('div',
+        'verdict verdict-line ' + (verdict === 'please' ? 'please' : 'veto'),
+        verdict === 'please' ? 'PLEASE PLAY' : 'HECK NO'));
+    }
     body.addEventListener('click', () => { if (song) openEditor(song); });
     li.appendChild(body);
 
@@ -462,6 +474,13 @@
       if (song.note) meta.push(song.note);
       t.appendChild(el('div', 'meta', meta.join(' · ')));
       li.appendChild(t);
+
+      const verdict = (doc().clientVerdicts || {})[song.id];
+      if (verdict) {
+        li.appendChild(el('span',
+          'verdict ' + (verdict === 'please' ? 'please' : 'veto'),
+          verdict === 'please' ? 'PLEASE PLAY' : 'HECK NO'));
+      }
 
       const uses = inDoc.get(song.id) || 0;
       if (uses) {
@@ -745,6 +764,94 @@
         ' added to the library.' : ''));
   }
 
+  // --- Song picks from the couple -------------------------------------------
+
+  // The couple's verdicts ride inside links, both ways. The outgoing link
+  // carries the repertoire to the request page; the reply carries titles
+  // marked PLEASE PLAY or HECK NO back here, where they become badges in
+  // the library while this gig's setlist is being built. No server: the
+  // links are the transport, messaging apps are the network.
+
+  let picksUrl = '';
+
+  function openPicksShare() {
+    const d = doc();
+    const songs = state.library.slice()
+      .sort((a, b) => a.title.localeCompare(b.title));
+    if (!songs.length) { toast('The library is empty.'); return; }
+    const sid = uid();
+    if (!Array.isArray(d.shares)) d.shares = [];
+    d.shares.push({ sid, when: Date.now() });
+    save();
+    const payload = LZString.compressToEncodedURIComponent(JSON.stringify({
+      v: 1, kind: 'list', sid,
+      couple: d.header.couple || '',
+      songs: songs.map((s) => s.title),
+    }));
+    picksUrl = REQUEST_PAGE_URL + '#p=' + payload;
+    $('#psBlurb').textContent = 'Send ' + (d.header.couple || 'the couple') +
+      ' this link. They tap PLEASE PLAY or HECK NO on any of the ' +
+      songs.length + ' songs and send their picks straight back - when ' +
+      'you open their reply, the verdicts appear in the library here.';
+    $('#psShare').classList.toggle('hidden', !navigator.share);
+    $('#picksShare').classList.remove('hidden');
+  }
+
+  function closePicksSheets() {
+    $('#picksShare').classList.add('hidden');
+    $('#picksImport').classList.add('hidden');
+  }
+
+  // A reply can arrive as a tapped link (the hash), a pasted link, or a
+  // pasted bare code; this digs the payload out of any of them.
+  function picksPayloadFrom(text) {
+    const m = String(text || '').match(/p=([A-Za-z0-9+$\-]+)/);
+    const raw = m ? m[1] : String(text || '').trim();
+    if (!raw) return null;
+    try {
+      const data = JSON.parse(LZString.decompressFromEncodedURIComponent(raw));
+      if (data && data.kind === 'picks' &&
+          Array.isArray(data.please) && Array.isArray(data.no)) return data;
+    } catch (e) { /* not a picks code */ }
+    return null;
+  }
+
+  function applyPicks(data) {
+    // The reply names the share it answers; find the gig that sent it.
+    let d = state.docs.find((x) =>
+      (x.shares || []).some((s) => s.sid === data.sid));
+    if (!d) {
+      d = doc();
+      if (!confirm('These picks do not match a link sent from this ' +
+        'device. Apply them to "' + (d.header.couple || 'Untitled') +
+        '"?')) return;
+    }
+    const byTitle = new Map();
+    for (const s of state.library) byTitle.set(normTitle(s.title), s);
+    const verdicts = {};
+    let missed = 0;
+    const mark = (titles, verdict) => {
+      for (const title of titles) {
+        const song = byTitle.get(normTitle(title));
+        if (song) verdicts[song.id] = verdict;
+        else missed++;
+      }
+    };
+    mark(data.please, 'please');
+    mark(data.no, 'no');
+    // A newer reply replaces the old one wholesale - a couple changing
+    // their minds should not leave stale verdicts behind.
+    d.clientVerdicts = verdicts;
+    d.clientPicksFrom = data.couple || '';
+    d.clientPicksWhen = Date.now();
+    state.activeDocId = d.id;
+    save(); renderAll();
+    toast('Picks from ' + (data.couple || 'the couple') + ': ' +
+      data.please.length + ' PLEASE PLAY, ' + data.no.length + ' HECK NO.' +
+      (missed ? ' ' + missed + ' song' + (missed === 1 ? '' : 's') +
+        ' not in the library skipped.' : ''));
+  }
+
   // --- Documents -----------------------------------------------------------
 
   function newDoc() {
@@ -758,6 +865,11 @@
     const copy = JSON.parse(JSON.stringify(doc()));
     copy.id = uid();
     copy.header.couple = (copy.header.couple || 'Untitled') + ' (copy)';
+    // The couple's song picks belong to their gig, not the next one.
+    delete copy.shares;
+    delete copy.clientVerdicts;
+    delete copy.clientPicksFrom;
+    delete copy.clientPicksWhen;
     state.docs.push(copy);
     state.activeDocId = copy.id;
     save(); renderAll();
@@ -1221,7 +1333,7 @@
     });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
-        closeEditor(); closePicker(); closeCrewEditor();
+        closeEditor(); closePicker(); closeCrewEditor(); closePicksSheets();
       }
       if (e.key === 'Enter' &&
           !$('#songEditor').classList.contains('hidden') &&
@@ -1239,6 +1351,46 @@
         $('#menuPop').classList.add('hidden');
       }
     });
+    $('#sharePicks').addEventListener('click', () => {
+      $('#menuPop').classList.add('hidden'); openPicksShare();
+    });
+    $('#importPicks').addEventListener('click', () => {
+      $('#menuPop').classList.add('hidden');
+      $('#piText').value = '';
+      $('#picksImport').classList.remove('hidden');
+      $('#piText').focus();
+    });
+    $('#psCopy').addEventListener('click', () => {
+      navigator.clipboard.writeText(picksUrl).then(
+        () => toast('Link copied. Send it to the couple.'),
+        () => toast('Could not reach the clipboard.'));
+      closePicksSheets();
+    });
+    $('#psShare').addEventListener('click', () => {
+      navigator.share({
+        text: 'Pick the songs you want (and the ones you don\'t!): ',
+        url: picksUrl,
+      }).catch(() => {});
+      closePicksSheets();
+    });
+    $('#psCancel').addEventListener('click', closePicksSheets);
+    $('#picksShare').addEventListener('click', (e) => {
+      if (e.target === $('#picksShare')) closePicksSheets();
+    });
+    $('#piApply').addEventListener('click', () => {
+      const data = picksPayloadFrom($('#piText').value);
+      if (!data) {
+        toast('That does not look like a song picks link or code.');
+        return;
+      }
+      closePicksSheets();
+      applyPicks(data);
+    });
+    $('#piCancel').addEventListener('click', closePicksSheets);
+    $('#picksImport').addEventListener('click', (e) => {
+      if (e.target === $('#picksImport')) closePicksSheets();
+    });
+
     $('#exportJson').addEventListener('click', () => {
       $('#menuPop').classList.add('hidden'); exportJson();
     });
@@ -1262,13 +1414,57 @@
     $('#libClose').addEventListener('click', () => setLibOpen(false));
   }
 
+  // --- Updates -------------------------------------------------------------
+
+  // The service worker downloads a new version in the background whenever
+  // one is published. This banner is how anyone finds out: one tap, and
+  // the new version is on screen. No cache clearing, ever.
+  function showUpdateBanner() {
+    if ($('#updateBar')) return;
+    const bar = el('div');
+    bar.id = 'updateBar';
+    bar.appendChild(el('span', null, 'A new version is ready.'));
+    const b = el('button', null, 'Update now');
+    b.addEventListener('click', () => location.reload());
+    bar.appendChild(b);
+    document.body.appendChild(bar);
+  }
+
   // --- Boot ----------------------------------------------------------------
 
   load();
   wire();
   renderAll();
 
+  // A tapped reply link lands here as "#p=...". It arrives as a fresh load,
+  // or as a bare hash change when the app is already open (an installed
+  // copy reusing its running window does that). Either way: import it,
+  // then take the payload off the address bar so a reload does not re-ask.
+  function importFromAddress() {
+    if (!/p=/.test(location.hash)) return;
+    const picks = picksPayloadFrom(location.hash);
+    history.replaceState(null, '', location.pathname + location.search);
+    if (picks) applyPicks(picks);
+  }
+  importFromAddress();
+  window.addEventListener('hashchange', importFromAddress);
+
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // A fresh install stays silent; only an update to an app already
+      // running gets the banner, once the new version is ready to serve.
+      reg.addEventListener('updatefound', () => {
+        const next = reg.installing;
+        if (!next || !navigator.serviceWorker.controller) return;
+        next.addEventListener('statechange', () => {
+          if (next.state === 'activated') showUpdateBanner();
+        });
+      });
+      // Installed copies can sit in memory for days; look for a new
+      // version whenever the app comes back to the foreground.
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) reg.update().catch(() => {});
+      });
+    }).catch(() => {});
   }
 })();

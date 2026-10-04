@@ -1,0 +1,10 @@
+/* Google Sans (variable 400-700, latin subset), vendored so the app works
+ * offline. Downloaded from Google Fonts - SIL Open Font License 1.1.
+ * Linking fonts.googleapis.com instead would break the offline promise. */
+@font-face {
+  font-family: 'Google Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('google-sans-latin.woff2') format('woff2');
+}

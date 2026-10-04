@@ -36,6 +36,8 @@
 </header>
 
 <div id="menuPop" class="menu hidden">
+  <button id="sharePicks">Song picks link for the couple…</button>
+  <button id="importPicks">Import song picks…</button>
   <button id="exportJson">Export backup (JSON)</button>
   <button id="importJson">Import backup…</button>
   <button id="crewMembers">Crew members…</button>
@@ -121,6 +123,32 @@
   </div>
 </div>
 
+<div id="picksShare" class="sheet hidden">
+  <div class="sheet-card pick-card">
+    <h2>Song picks link</h2>
+    <div class="pick-song" id="psBlurb"></div>
+    <div class="sheet-actions">
+      <button id="psCancel" class="ghost">Cancel</button>
+      <span class="grow"></span>
+      <button id="psCopy" class="ghost">Copy link</button>
+      <button id="psShare" class="primary">Share…</button>
+    </div>
+  </div>
+</div>
+
+<div id="picksImport" class="sheet hidden">
+  <div class="sheet-card pick-card">
+    <h2>Import song picks</h2>
+    <div class="pick-song">Paste the link or code the couple sent back.</div>
+    <textarea id="piText" rows="4" autocomplete="off"></textarea>
+    <div class="sheet-actions">
+      <span class="grow"></span>
+      <button id="piCancel" class="ghost">Cancel</button>
+      <button id="piApply" class="primary">Import</button>
+    </div>
+  </div>
+</div>
+
 <div id="crewEditor" class="sheet hidden">
   <div class="sheet-card pick-card">
     <h2>Crew members</h2>
@@ -139,6 +167,7 @@
 
 <script src="vendor/sortable.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/lz-string.min.js"></script>
 <script src="seed.js"></script>
 <script src="template.js"></script>
 <script src="app.js"></script>

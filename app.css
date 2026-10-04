@@ -521,6 +521,43 @@ button.ghost.wide:hover {
 .sheet-actions .ghost.danger { color: var(--new); border-color: #f2cccc; }
 .sheet-actions .ghost.danger:hover { background: var(--new-soft); }
 
+/* --- The couple's song picks -------------------------------------------- */
+/* What the couple said, worn as a badge wherever the song shows up. */
+.verdict {
+  flex: none; border-radius: 20px; padding: 2px 8px;
+  font-size: 9px; font-weight: 800; letter-spacing: .05em;
+  white-space: nowrap;
+}
+.verdict.please { background: var(--accent-soft); color: var(--accent-deep); }
+.verdict.veto { background: var(--new-soft); color: var(--new); }
+.verdict-line {
+  display: inline-block; margin-top: 2px; padding: 1px 8px;
+}
+
+.sheet-card textarea {
+  width: 100%; margin-top: 2px;
+  padding: 9px 12px; border: 1px solid var(--line-strong);
+  border-radius: 9px; font: inherit; font-size: 13px; resize: vertical;
+}
+.sheet-card textarea:focus {
+  outline: none; border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+/* --- Update banner -------------------------------------------------------- */
+#updateBar {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 70; display: flex; align-items: center; gap: 14px;
+  background: var(--ink); color: #fff;
+  padding: 10px 12px 10px 18px; border-radius: 12px;
+  box-shadow: var(--shadow-2); font-size: 13.5px; white-space: nowrap;
+}
+#updateBar button {
+  background: var(--accent); border: none; color: #fff;
+  font-weight: 650; padding: 7px 14px; border-radius: 8px;
+}
+#updateBar button:hover { background: var(--accent-deep); }
+
 /* --- Toast -------------------------------------------------------------- */
 #toast { font-weight: 500; }
 
@@ -563,6 +600,8 @@ button.ghost.wide:hover {
   .fab:active { transform: scale(.97); }
   .appbar { gap: 8px; padding: 10px 12px; }
   .exports { margin-left: 0; }
+  /* Clear of the Library fab. */
+  #updateBar { bottom: 80px; }
   .disclaimer { padding: 5px 10px; font-size: 10.5px; }
   .brand img { height: 30px; }
   .brand span { font-size: 13px; padding-left: 9px; }
@@ -572,7 +611,7 @@ button.ghost.wide:hover {
 @media print {
   body { background: #fff; }
   .appbar, .library, .fab, .scaffold, #addSet, .menu, .disclaimer,
-  .crew-bar,
+  .crew-bar, .verdict, #updateBar,
   .entry .grip, .entry .rm, .entry .flags, .set-tools { display: none !important; }
   main { display: block; padding: 0; max-width: none; }
   .paper { border: none; box-shadow: none; padding: 0; }

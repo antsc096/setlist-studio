@@ -1,7 +1,7 @@
 # Sugar Whiskey Setlist Manager
 
 A setlist builder for The Sugar Whiskey Band, created by Anthony Collins
-for the band's sole use. One static page: no server, no account, no login,
+for the band's sole use. Static pages: no server, no account, no login,
 and after the first visit, no network. Everything lives in your browser's
 storage on your own device.
 
@@ -53,6 +53,64 @@ Each installed copy keeps its own data, so send the band the link and use
 - Multiple setlists saved side by side; duplicate one as next gig's
   starting point.
 
+## Song picks from the couple
+
+The couple gets a say before the setlist is built, without an account,
+a server, or anything to install. The links themselves carry the data:
+
+1. In the ⋯ menu, **Song picks link for the couple…** builds a link with
+   the whole repertoire compressed into it and opens the share sheet.
+   Text it to the couple.
+2. The couple opens it on the **song picks page** (`request/`, a second
+   page in this repo) and taps **PLEASE PLAY** or **HECK NO** on any
+   song, then **Send to the band**, which shares a small reply link back.
+3. Tapping their reply shows what they picked, with a button into the
+   manager. The verdicts land on that gig's setlist and show as green
+   and red badges in the library and on set lines while building.
+
+Notes on how it behaves:
+
+- Verdicts belong to the gig, not the library: two gigs in flight keep
+  separate picks, and duplicating a setlist does not carry them over.
+- A second reply from the same couple replaces the first wholesale.
+- Songs are matched by title, so the reply survives library edits; the
+  reply names the share it answers, so it finds the right setlist.
+- Open the reply on the phone that holds the setlist. If the marks do
+  not appear (iPhone home-screen apps keep separate storage from
+  Safari), the reply page offers a copyable code for
+  ⋯ → **Import song picks…**, which also accepts the whole pasted link.
+- The couple's page keeps a draft of their picks in their browser, so
+  closing the tab halfway through loses nothing.
+
+### Moving the picks page onto the band's domain
+
+The page works today at the GitHub Pages address. To serve it from
+`requests.thesugarwhiskey.com` once there is access to the Wix DNS:
+
+1. Make a new public repo (say `song-requests`) containing a copy of
+   the `request/` folder's contents at its root - the folder is
+   self-contained on purpose.
+2. In the Wix dashboard: Domains → DNS records → add a CNAME,
+   host `requests`, value `antsc096.github.io`.
+3. In the new repo: Settings → Pages → deploy from the main branch,
+   then set the custom domain to `requests.thesugarwhiskey.com` and
+   tick "Enforce HTTPS" once the certificate appears.
+4. In this repo, change `REQUEST_PAGE_URL` at the top of `app.js` to
+   the new address and bump `CACHE` in `sw.js`.
+
+Do not attach the custom domain to *this* repo: that would move the
+manager's address too, and every installed copy would start empty.
+
+## Updates
+
+Nobody ever needs to clear a cache. The service worker precaches one
+versioned bundle; when a new version is published (any file change plus
+a `CACHE` bump in `sw.js`), installed copies download it silently in
+the background the next time the app is opened or foregrounded, then
+show a banner: **"A new version is ready - Update now."** One tap and
+it is live. Without the tap, the new version arrives on the next
+app launch anyway.
+
 ## Getting it out
 
 - **PDF**: one tap. On phones it opens the share sheet (straight into
@@ -67,11 +125,18 @@ Each installed copy keeps its own data, so send the band the link and use
 
 ## Notes
 
-- No build step. `index.html` + `app.css` + `app.js`, with SortableJS and
-  jsPDF vendored in `vendor/` (both MIT), and Google Sans vendored beside
-  them (SIL OFL, from Google Fonts). Nothing loads from a CDN: a
-  `fonts.googleapis.com` link would break the offline promise, so the
-  woff2 is served from this repo and precached like everything else.
+- No build step. `index.html` + `app.css` + `app.js`, with SortableJS,
+  jsPDF and lz-string vendored in `vendor/` (all MIT), and Google Sans
+  vendored beside them (SIL OFL, from Google Fonts). Nothing loads from
+  a CDN: a `fonts.googleapis.com` link would break the offline promise,
+  so the woff2 is served from this repo and precached like everything
+  else. lz-string squeezes the song picks payloads so a
+  152-song link stays near 2 KB.
+- `request/` is the couple-facing song picks page: its own small
+  `index.html` + `app.css` + `app.js` with copies of the font, brand
+  and lz-string, so the folder can be lifted onto the band's domain
+  as-is. It is not precached: couples are online, and changes to it
+  do not need a `CACHE` bump.
 - The band's wordmark lives in `brand/`; the app bar sets it against
   "Setlist Manager".
 - `sw.js` precaches every file the page asks for. Add an asset, add it to
