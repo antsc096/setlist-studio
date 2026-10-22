@@ -195,6 +195,9 @@ main > * { min-width: 0; }
   padding: 0 0 8px;
 }
 .h-title::placeholder { color: var(--ink-mute); font-weight: 650; }
+/* The couple's first names get their own line: the title above can carry
+   notes for the band, and this is what the couple's link greets them by. */
+.h-grid.h-names { grid-template-columns: 1fr; margin-bottom: 0; }
 .h-grid {
   display: grid; grid-template-columns: repeat(3, 1fr);
   gap: 6px 20px; margin: 6px 0 10px;

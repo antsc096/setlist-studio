@@ -36,7 +36,7 @@
     const doc = {
       id: uid(),
       header: {
-        couple: '', venue: '', date: '', crew: '',
+        couple: '', names: '', venue: '', date: '', crew: '',
         sound: '', contact: '', mc: '', notes: '',
       },
       numSets: 4,
@@ -205,7 +205,8 @@
   };
 
   const headerFields = [
-    ['hCouple', 'couple'], ['hVenue', 'venue'], ['hDate', 'date'],
+    ['hCouple', 'couple'], ['hNames', 'names'],
+    ['hVenue', 'venue'], ['hDate', 'date'],
     ['hCrew', 'crew'], ['hSound', 'sound'], ['hContact', 'contact'],
     ['hMc', 'mc'], ['hNotes', 'notes'],
   ];
@@ -887,16 +888,21 @@
     if (!Array.isArray(d.shares)) d.shares = [];
     d.shares.push({ sid, when: Date.now() });
     save();
+    // Only the first names travel: the title is the band's own label for
+    // the gig and can carry notes the couple should never see.
+    const names = (d.header.names || '').trim();
     const payload = LZString.compressToEncodedURIComponent(JSON.stringify({
       v: 1, kind: 'list', sid,
-      couple: d.header.couple || '',
+      couple: names,
       songs: songs.map((s) => s.title),
     }));
     picksUrl = REQUEST_PAGE_URL + '#p=' + payload;
-    $('#psBlurb').textContent = 'Send ' + (d.header.couple || 'the couple') +
+    $('#psBlurb').textContent = 'Send ' + (names || 'the couple') +
       ' this link. They tap PLEASE PLAY or HECK NO on any of the ' +
       songs.length + ' songs and send their picks straight back - when ' +
-      'you open their reply, the verdicts appear in the library here.';
+      'you open their reply, the verdicts appear in the library here.' +
+      (names ? '' : " Fill in the couple's first names on the setlist " +
+        'first and the link greets them by name.');
     $('#psShare').classList.toggle('hidden', !navigator.share);
     $('#picksShare').classList.remove('hidden');
   }
