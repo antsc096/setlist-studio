@@ -1,7 +1,7 @@
 /* Offline is the product: after one visit, everything is served from this
    cache. Bump the version string whenever any file changes, or installed
    copies keep the old app forever. */
-const CACHE = 'setlist-studio-v15';
+const CACHE = 'setlist-studio-v16';
 const ASSETS = [
   './',
   'index.html',
@@ -20,9 +20,13 @@ const ASSETS = [
   'icons/icon-512.png',
 ];
 
+// Each file is fetched fresh from the server. GitHub Pages lets browsers
+// keep files for 10 minutes, so a plain fetch straight after publishing
+// could fill the new cache with the old files and strand the update.
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE).then((cache) => cache.addAll(
+      ASSETS.map((url) => new Request(url, { cache: 'reload' }))))
       .then(() => self.skipWaiting()),
   );
 });

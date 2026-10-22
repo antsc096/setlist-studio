@@ -934,13 +934,30 @@
     }
     const byTitle = new Map();
     for (const s of state.library) byTitle.set(normTitle(s.title), s);
+    const seedByTitle = new Map();
+    for (const s of SEED_LIBRARY) seedByTitle.set(normTitle(s.title), s);
     const verdicts = {};
-    let missed = 0;
+    let added = 0;
+    // The website offers couples the full repertoire, so a pick can name a
+    // song this device's library has lost. It joins the library (with its
+    // seed singers and keys when known) rather than the pick being dropped.
     const mark = (titles, verdict) => {
       for (const title of titles) {
-        const song = byTitle.get(normTitle(title));
-        if (song) verdicts[song.id] = verdict;
-        else missed++;
+        let song = byTitle.get(normTitle(title));
+        if (!song) {
+          const seed = seedByTitle.get(normTitle(title));
+          song = {
+            id: uid(),
+            title: seed ? seed.title : title,
+            parts: seed ? parseSung(seed.sung) : [],
+            note: (seed && seed.note) || '',
+            isNew: false,
+          };
+          state.library.push(song);
+          byTitle.set(normTitle(title), song);
+          added++;
+        }
+        verdicts[song.id] = verdict;
       }
     };
     mark(data.please, 'please');
@@ -968,8 +985,8 @@
       data.please.length + ' PLEASE PLAY, ' + data.no.length + ' HECK NO.' +
       (ticked ? ' ' + ticked + ' setlist line' + (ticked === 1 ? '' : 's') +
         ' ticked req.' : '') +
-      (missed ? ' ' + missed + ' song' + (missed === 1 ? '' : 's') +
-        ' not in the library skipped.' : ''));
+      (added ? ' ' + added + ' song' + (added === 1 ? '' : 's') +
+        ' added to the library.' : ''));
   }
 
   // --- Documents -----------------------------------------------------------
