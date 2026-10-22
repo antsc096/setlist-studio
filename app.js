@@ -16,6 +16,11 @@
   // and bump the service worker cache version. The couple's reply still
   // comes back through this app's own request/ page.
   const REQUEST_PAGE_URL = 'http://localhost:8765/song-picks.html';
+  // The couple's "Send to the band" lands here, and this app checks it
+  // while any gig has a picks link out. Concept demo: it is the website's
+  // local demo server (tools/demo-server.mjs in the website project); a
+  // real backend replaces it when the site goes live.
+  const PICKS_INBOX_URL = 'http://localhost:8765/api/picks';
 
   // Who turns up. Every name field offers these instead of typing, and
   // anyone typed in who is not on the list joins it.
@@ -236,6 +241,17 @@
     for (const [id, field] of headerFields) {
       $('#' + id).value = doc().header[field] || '';
     }
+    const d = doc();
+    const line = $('#hPicks');
+    line.classList.toggle('hidden', !d.clientPicksWhen);
+    if (!d.clientPicksWhen) return;
+    const v = Object.values(d.clientVerdicts || {});
+    line.textContent = 'Song picks from ' + (d.clientPicksFrom || 'the couple') +
+      ', ' + new Date(d.clientPicksWhen).toLocaleString('en-AU', {
+        day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
+      }) + ': ' + v.filter((x) => x === 'please').length + ' PLEASE PLAY, ' +
+      v.filter((x) => x === 'no').length + ' HECK NO' +
+      (d.clientFirstDance ? '. First dance: ' + d.clientFirstDance : '') + '.';
   }
 
   function renderScaffold() {
@@ -926,7 +942,7 @@
     return null;
   }
 
-  function applyPicks(data) {
+  function applyPicks(data, quiet) {
     // The reply names the share it answers; find the gig that sent it.
     let d = state.docs.find((x) =>
       (x.shares || []).some((s) => s.sid === data.sid));
@@ -970,7 +986,8 @@
     // their minds should not leave stale verdicts behind.
     d.clientVerdicts = verdicts;
     d.clientPicksFrom = data.couple || '';
-    d.clientPicksWhen = Date.now();
+    d.clientPicksWhen = data.at || Date.now();
+    d.clientFirstDance = data.firstDance || '';
     // Lines already on the setlist catch up: a PLEASE PLAY ticks req.
     // Nothing is ever unticked - a request made in person stays made.
     let ticked = 0;
@@ -982,6 +999,10 @@
           ticked++;
         }
       }
+    }
+    if (quiet) {
+      save(); renderAll();
+      return { doc: d, ticked, added };
     }
     state.activeDocId = d.id;
     save(); renderAll();
@@ -1011,6 +1032,7 @@
     delete copy.clientVerdicts;
     delete copy.clientPicksFrom;
     delete copy.clientPicksWhen;
+    delete copy.clientFirstDance;
     state.docs.push(copy);
     state.activeDocId = copy.id;
     save(); renderAll();
@@ -1640,6 +1662,73 @@
     document.body.appendChild(bar);
   }
 
+  // --- Song picks inbox ---------------------------------------------------
+
+  // While a gig has a picks link out, look for the couple's reply every few
+  // seconds (and straight away on coming back to the app). Each reply is
+  // applied once, to the gig whose link it answers; replies for gigs on
+  // another device are left alone.
+  const INBOX_EVERY_MS = 5000;
+  let inboxBusy = false;
+
+  const waitingOnPicks = () =>
+    state.docs.some((d) => (d.shares || []).length);
+
+  function checkInbox() {
+    if (inboxBusy || document.hidden || !waitingOnPicks()) return;
+    inboxBusy = true;
+    fetch(PICKS_INBOX_URL, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((replies) => {
+        if (!Array.isArray(replies)) return;
+        if (!Array.isArray(state.inboxSeen)) state.inboxSeen = [];
+        for (const reply of replies) {
+          if (!reply || !reply.id || state.inboxSeen.includes(reply.id)) continue;
+          if (!reply.sid || !state.docs.some((d) =>
+            (d.shares || []).some((s) => s.sid === reply.sid))) continue;
+          if (!Array.isArray(reply.please) || !Array.isArray(reply.no)) continue;
+          state.inboxSeen.push(reply.id);
+          const result = applyPicks(reply, true);
+          if (result) showPicksBanner(reply, result);
+        }
+      })
+      .catch(() => { /* demo server not running: nothing to fetch */ })
+      .then(() => { inboxBusy = false; });
+  }
+
+  // Stays up until dismissed: a couple's picks arriving is the news.
+  function showPicksBanner(reply, result) {
+    const old = $('#picksBar');
+    if (old) old.remove();
+    const d = result.doc;
+    const bar = el('div');
+    bar.id = 'picksBar';
+    bar.setAttribute('role', 'status');
+    const text = el('div', 'pb-text');
+    text.appendChild(el('b', null, (reply.couple || 'The couple') +
+      ' sent their song picks'));
+    text.appendChild(el('span', null, reply.please.length + ' PLEASE PLAY, ' +
+      reply.no.length + ' HECK NO' +
+      (reply.firstDance ? '. First dance: ' + reply.firstDance : '') +
+      (result.ticked ? '. ' + result.ticked + ' setlist line' +
+        (result.ticked === 1 ? '' : 's') + ' ticked req' : '') + '.'));
+    bar.appendChild(text);
+    if (state.activeDocId !== d.id) {
+      const open = el('button', null, 'Open setlist');
+      open.addEventListener('click', () => {
+        state.activeDocId = d.id;
+        save(); renderAll();
+        bar.remove();
+      });
+      bar.appendChild(open);
+    }
+    const x = el('button', 'pb-close', '×');
+    x.setAttribute('aria-label', 'Dismiss');
+    x.addEventListener('click', () => bar.remove());
+    bar.appendChild(x);
+    document.body.appendChild(bar);
+  }
+
   // --- Boot ----------------------------------------------------------------
 
   load();
@@ -1658,6 +1747,10 @@
   }
   importFromAddress();
   window.addEventListener('hashchange', importFromAddress);
+
+  checkInbox();
+  setInterval(checkInbox, INBOX_EVERY_MS);
+  document.addEventListener('visibilitychange', checkInbox);
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').then((reg) => {
