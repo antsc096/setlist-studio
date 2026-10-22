@@ -12,8 +12,12 @@
   // Where the couple-facing song picks page lives. When the band's domain
   // is wired up, switch this to https://requests.thesugarwhiskey.com/ (the
   // README has the checklist) and bump the service worker cache version.
-  const REQUEST_PAGE_URL =
-    'https://antsc096.github.io/setlist-studio/request/';
+  // Run from localhost, the link opens the band website's song picks page
+  // on its local preview server instead, for testing the new site.
+  const IS_LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  const REQUEST_PAGE_URL = IS_LOCAL
+    ? 'http://localhost:8765/song-picks.html'
+    : 'https://antsc096.github.io/setlist-studio/request/';
 
   // Who turns up. Every name field offers these instead of typing, and
   // anyone typed in who is not on the list joins it.
@@ -137,6 +141,25 @@
           const song = songById(item.songId);
           if (song && song.parts.length) item.partId = song.parts[0].id;
         }
+      }
+    }
+    // The first release seeded 53 songs; the full repertoire came later,
+    // but the seed only fills an empty library, so early devices never got
+    // it. Add whatever is missing, once per device, so songs deleted after
+    // this point stay deleted.
+    if (!state.toppedUpFullRepertoire) {
+      state.toppedUpFullRepertoire = true;
+      const have = new Set(state.library.map((s) => normTitle(s.title)));
+      for (const s of SEED_LIBRARY) {
+        if (have.has(normTitle(s.title))) continue;
+        have.add(normTitle(s.title));
+        state.library.push({
+          id: uid(),
+          title: s.title,
+          parts: parseSung(s.sung),
+          note: s.note || '',
+          isNew: false,
+        });
       }
     }
   }
