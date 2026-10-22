@@ -9,15 +9,13 @@
 
   const STORE_KEY = 'setlist-studio.v1';
 
-  // Where the couple-facing song picks page lives. When the band's domain
-  // is wired up, switch this to https://requests.thesugarwhiskey.com/ (the
-  // README has the checklist) and bump the service worker cache version.
-  // Run from localhost, the link opens the band website's song picks page
-  // on its local preview server instead, for testing the new site.
-  const IS_LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  const REQUEST_PAGE_URL = IS_LOCAL
-    ? 'http://localhost:8765/song-picks.html'
-    : 'https://antsc096.github.io/setlist-studio/request/';
+  // Where the couple-facing song picks page lives: the band website's page.
+  // For the concept demo that is the website's local preview server, so
+  // the link only opens on the computer running it. When the new site goes
+  // live, change this to https://www.thesugarwhiskey.com/song-picks.html
+  // and bump the service worker cache version. The couple's reply still
+  // comes back through this app's own request/ page.
+  const REQUEST_PAGE_URL = 'http://localhost:8765/song-picks.html';
 
   // Who turns up. Every name field offers these instead of typing, and
   // anyone typed in who is not on the list joins it.
