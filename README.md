@@ -45,10 +45,17 @@ Each installed copy keeps its own data, so send the band the link and use
   tonight"), entered by tapping the song on a set line, stays with that
   gig and shows in the accent colour. Both carry into the PDF and both
   copy formats.
-- Tick **requested by the couple** on a line, **first dance** on the song
-  the couple dance to, or **new song** on a song. First dance shows purple
-  and bold, new songs red everywhere so the band can see what to learn.
-  All three carry through to the PDF and both copy formats. So the
+- **First dance** and **Father & daughter dance** are fields at the top of
+  the setlist, like the couple's song picks form: search the library (it
+  fills in as you type) or name any song with its artist, plus notes. Each
+  marks its song's line, adding one if it isn't on the setlist yet (the
+  first dance opens Set 2, the father and daughter dance follows it), and
+  the couple's own choices fill them. Both are in the printed header too.
+- Tick **requested by the couple** on a line, or **new song** on a song.
+  The first dance shows purple and bold, new songs red everywhere so the
+  band can see what to learn, and in words as well, for black-and-white
+  printers: "(FIRST DANCE)", "(FATHER & DAUGHTER DANCE)" and 🆕. All of
+  it carries through to the PDF and both copy formats. So the
   artist reading it knows what the colours and bold mean, the PDF,
   the Docs copy, the printed page and the document itself all end
   with a legend - shown only when a marked song is on the list, and

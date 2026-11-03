@@ -36,6 +36,22 @@
   const uid = () =>
     Date.now().toString(36) + '-' + (uidCounter++).toString(36);
 
+  // A gig's first dance, and its father and daughter dance: one of the
+  // library's songs (mode "list") or a song named by hand (mode "own"),
+  // with notes for the band. Each is set from its field at the top of the
+  // setlist, or by the couple's picks (from), and marks its song's line.
+  // `mark` flags the line; `line`, `added` and `note` remember which line
+  // the field marked, whether it added it, and the notes it put there.
+  const DANCES = {
+    firstDance: { mark: 'firstDance', line: 'danceLine', added: 'danceAdded', note: 'danceNote' },
+    fatherDaughter: { mark: 'fatherDaughter', line: 'fdLine', added: 'fdAdded', note: 'fdNote' },
+  };
+  const noDance = () =>
+    ({ mode: '', songId: '', title: '', artist: '', notes: '', from: 'band' });
+  // A couple's dance as words ("Perfect (Ed Sheeran)"), whichever way it came.
+  const danceText = (fd) => (!fd ? '' : typeof fd === 'string' ? fd
+    : (fd.title || '') + (fd.artist ? ' (' + fd.artist + ')' : ''));
+
   function defaultDoc() {
     // Four sets of twelve: the shape of the real sheet this replaces.
     const doc = {
@@ -44,6 +60,8 @@
         couple: '', names: '', venue: '', date: '', crew: '',
         sound: '', contact: '', mc: '', notes: '',
       },
+      firstDance: noDance(),
+      fatherDaughter: noDance(),
       numSets: 4,
       songsPerSet: 12,
       sets: [],
@@ -280,6 +298,24 @@
       });
   }
 
+  // Inside the hub the couple's picks arrive at the hub, not here: their
+  // dances fill this gig's dance fields that are still empty.
+  function dancesFromGig() {
+    if (!GIG) return;
+    fetch('/api/admin/gigs/' + encodeURIComponent(GIG), { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null)).then((g) => {
+        const picks = g && g.picks;
+        const d = state.docs.find((x) => x.gigId === GIG);
+        if (!picks || !d) return;
+        let changed = false;
+        for (const key of Object.keys(DANCES)) {
+          const theirs = danceFromPicks(picks[key]);
+          if (theirs && !(d[key] && d[key].mode)) { setDance(d, key, theirs); changed = true; }
+        }
+        if (changed) { save(); renderAll(); }
+      }).catch(() => {});
+  }
+
   function startHub() {
     if (EMBED) document.body.classList.add('embedded');
     hubGet().then((value) => {
@@ -301,6 +337,7 @@
         if (changed || !fromHub || JSON.stringify(state) !== before) hubSave();
         renderAll();
         ready();
+        dancesFromGig();
         if (moved) {
           toast(moved + ' setlist' + (moved === 1 ? '' : 's') + ' saved only in this browser ' +
             (moved === 1 ? 'is' : 'are') + ' now in the hub too.');
@@ -332,6 +369,25 @@
   function migrate() {
     if (!state || !Array.isArray(state.library)) return;
     if (!Array.isArray(state.crew)) state.crew = DEFAULT_CREW.slice();
+    // The first dance was a "1st" tick on any line; it is a field at the
+    // top of the setlist now, and the field marks its line.
+    for (const d of (state.docs || [])) {
+      // An earlier version kept the couple's first names in two fields.
+      const h = d.header || {};
+      if (!h.names && (h.name1 || h.name2)) h.names = [h.name1, h.name2].filter(Boolean).join(' & ');
+      if (!d.fatherDaughter) d.fatherDaughter = noDance();
+      if (d.firstDance && d.firstDance.mode) continue;
+      d.firstDance = d.firstDance || noDance();
+      for (const set of (d.sets || [])) {
+        for (const item of (set.items || [])) {
+          if (!item.firstDance || d.firstDance.mode) continue;
+          const song = state.library.find((x) => x.id === item.songId);
+          if (!song) continue;
+          item.danceLine = true;
+          Object.assign(d.firstDance, { mode: 'list', songId: song.id, title: song.title });
+        }
+      }
+    }
     // The template used to carry a "First Dance" placeholder song. The
     // first dance is a mark on a real song now, so the stray library entry
     // and any line pointing at it go. Once per device, never again.
@@ -463,6 +519,7 @@
     for (const [id, field] of headerFields) {
       $('#' + id).value = doc().header[field] || '';
     }
+    renderDances();
     const d = doc();
     const line = $('#hPicks');
     line.classList.toggle('hidden', !d.clientPicksWhen);
@@ -473,7 +530,8 @@
         day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit',
       }) + ': ' + v.filter((x) => x === 'please').length + ' PLEASE PLAY, ' +
       v.filter((x) => x === 'no').length + ' HECK NO' +
-      (d.clientFirstDance ? '. First dance: ' + d.clientFirstDance : '') + '.';
+      (d.clientFirstDance ? '. First dance: ' + danceText(d.clientFirstDance) : '') +
+      (d.clientFatherDaughter ? '. Father & daughter dance: ' + danceText(d.clientFatherDaughter) : '') + '.';
   }
 
   function renderScaffold() {
@@ -599,7 +657,8 @@
     const li = el('li', 'entry' +
       ((song && song.isNew) ? ' is-new' : '') +
       (item.requested ? ' requested' : '') +
-      (item.firstDance ? ' first-dance' : ''));
+      (item.firstDance ? ' first-dance' : '') +
+      (item.fatherDaughter ? ' father-daughter' : ''));
 
     li.appendChild(el('span', 'num', number + '.'));
     li.appendChild(el('span', 'grip', '⋮⋮'));
@@ -607,7 +666,8 @@
     const body = el('div', 'song');
     const title = el('div', 'title' +
       (item.requested ? ' requested' : '') +
-      (item.firstDance ? ' first-dance' : ''),
+      (item.firstDance ? ' first-dance' : '') +
+      (item.fatherDaughter ? ' father-daughter' : ''),
       song ? song.title : '(deleted song)');
     body.appendChild(title);
     // The song's own note shows on every setlist; the line's note belongs
@@ -664,19 +724,6 @@
     reqL.appendChild(document.createTextNode('req'));
     reqL.title = 'Requested by the couple';
     flags.appendChild(reqL);
-
-    const danceL = el('label', 'dance-l');
-    const dance = el('input');
-    dance.type = 'checkbox';
-    dance.checked = !!item.firstDance;
-    dance.addEventListener('change', () => {
-      item.firstDance = dance.checked;
-      save(); renderSets();
-    });
-    danceL.appendChild(dance);
-    danceL.appendChild(document.createTextNode('1st'));
-    danceL.title = 'Played as the first dance';
-    flags.appendChild(danceL);
 
     const newL = el('label');
     const nw = el('input');
@@ -879,6 +926,233 @@
 
   let editing = null; // null = closed, {} without id = new song
   let editingItem = null; // the setlist line the editor was opened from
+
+  // --- The dances ------------------------------------------------------------
+
+  // The library song a title names. One the library has lost comes back
+  // from the seed with its singers and keys; one the band has never had
+  // joins with `unknown` (a dance named by hand: new, to learn).
+  function librarySong(title, unknown) {
+    const key = normTitle(title);
+    let song = state.library.find((x) => normTitle(x.title) === key);
+    if (!song) {
+      const seed = SEED_LIBRARY.find((x) => normTitle(x.title) === key);
+      song = {
+        id: uid(),
+        title: seed ? seed.title : title,
+        parts: seed ? parseSung(seed.sung) : [],
+        note: (seed && seed.note) || '',
+        isNew: false,
+        ...(seed ? {} : unknown),
+      };
+      state.library.push(song);
+    }
+    return song;
+  }
+
+  // A dance marks the gig's one line for it: a line already holding the
+  // song if there is one, otherwise a new line: the first dance opening
+  // Set 2, where the dancing starts, and the father and daughter dance
+  // straight after the first dance. Its notes go on that line. A new choice
+  // moves the mark, and a line added for an earlier choice goes.
+  function placeDance(d, key, fd, song) {
+    const k = DANCES[key];
+    const lines = [];
+    for (const set of d.sets) {
+      for (const item of set.items) {
+        if (!item.brk && !item.noteRow) lines.push({ set, item });
+      }
+    }
+    const prev = lines.find((l) => l.item[k.line]);
+    if (prev && !(song && prev.item.songId === song.id)) {
+      if (prev.item[k.added]) {
+        prev.set.items.splice(prev.set.items.indexOf(prev.item), 1);
+        lines.splice(lines.indexOf(prev), 1);
+      } else {
+        prev.item[k.mark] = false;
+        if (prev.item.note === prev.item[k.note]) delete prev.item.note;
+        delete prev.item[k.line];
+        delete prev.item[k.note];
+      }
+    }
+    if (!song) return null;
+    let target = lines.find((l) => l.item.songId === song.id);
+    if (!target) {
+      const item = {
+        songId: song.id, partId: song.parts.length ? song.parts[0].id : '',
+        [k.added]: true,
+      };
+      const first = key === 'fatherDaughter' && lines.find((l) => l.item.danceLine);
+      const set = first ? first.set : d.sets[1] || d.sets[0];
+      if (!set) return null;
+      if (first) set.items.splice(set.items.indexOf(first.item) + 1, 0, item);
+      else set.items.unshift(item);
+      target = { set, item };
+      lines.push(target);
+    }
+    // One of each dance per gig.
+    for (const l of lines) if (l !== target) l.item[k.mark] = false;
+    const line = target.item;
+    if (line.note === line[k.note] || fd.notes) {
+      line.note = fd.notes;
+      if (!line.note) delete line.note;
+    }
+    line[k.note] = fd.notes;
+    line[k.mark] = true;
+    line[k.line] = true;
+    // A song is one dance or the other: an old mark for the other dance on
+    // this line (one its field didn't put there) goes.
+    const other = DANCES[key === 'firstDance' ? 'fatherDaughter' : 'firstDance'];
+    if (line[other.mark] && !line[other.line]) line[other.mark] = false;
+    return { set: target.set.label };
+  }
+
+  // Sets one of the gig's dances and marks its line. A song added to the
+  // library only for an earlier choice, and used nowhere, goes again.
+  function setDance(d, key, next) {
+    const fd = { ...noDance(), ...next };
+    fd.title = String(fd.title || '').trim();
+    fd.artist = String(fd.artist || '').trim();
+    let song = null;
+    if (fd.mode === 'list') {
+      song = songById(fd.songId) || (fd.title ? librarySong(fd.title) : null);
+    } else if (fd.mode === 'own' && fd.title) {
+      song = librarySong(fd.title, { note: fd.artist, isNew: true, danceFor: d.id });
+      if (song.danceFor === d.id) song.note = fd.artist;
+    }
+    const before = d[key] && songById(d[key].songId);
+    fd.songId = song ? song.id : '';
+    if (song && fd.mode === 'list') fd.title = song.title;
+    d[key] = fd;
+    const placed = placeDance(d, key, fd, song);
+    if (before && before !== song && before.danceFor === d.id &&
+      !state.docs.some((x) => x.sets.some((set) =>
+        set.items.some((i) => i.songId === before.id)))) {
+      state.library = state.library.filter((x) => x !== before);
+    }
+    return placed;
+  }
+
+  // A couple's dance (from their picks) in the field's terms.
+  const danceFromPicks = (p) => (p && p.title ? {
+    mode: p.custom ? 'own' : 'list', title: p.custom ? p.title : (p.t || p.title),
+    artist: p.artist || '', notes: p.notes || '', from: 'couple',
+  } : null);
+
+  // Each dance's field: search the library and choose (it fills in as you
+  // type), or name any song with its artist, plus notes.
+  const danceBox = (key) => document.querySelector('.h-dance[data-dance="' + key + '"]');
+
+  function renderDances() {
+    for (const key of Object.keys(DANCES)) {
+      const box = danceBox(key);
+      if (!box) continue;
+      const fd = doc()[key] || noDance();
+      const song = fd.mode === 'list' ? songById(fd.songId) : null;
+      const q = (c) => box.querySelector(c);
+      q('.fd-pick').classList.toggle('hidden', !!song || fd.mode === 'own');
+      q('.fd-chosen').classList.toggle('hidden', !song);
+      q('.fd-own').classList.toggle('hidden', fd.mode !== 'own');
+      if (song) q('.fd-song').textContent = song.title;
+      if (fd.mode === 'own') {
+        q('.fd-title').value = fd.title;
+        q('.fd-artist').value = fd.artist;
+      }
+      q('.fd-notes').value = fd.notes || '';
+      q('.fd-mode').textContent = fd.mode === 'own' ? 'Search the library instead' : 'Not in the library?';
+      q('.fd-mode').classList.toggle('hidden', !!song);
+    }
+  }
+
+  function wireDance(key) {
+    const box = danceBox(key);
+    const q = (c) => box.querySelector(c);
+    const search = q('.fd-search');
+    const list = q('.fd-options');
+    let matches = [];
+    let active = -1;
+    const current = () => doc()[key] || noDance();
+    const commit = (next) => { setDance(doc(), key, next); save(); renderAll(); };
+    const close = () => {
+      list.classList.add('hidden');
+      list.innerHTML = '';
+      search.setAttribute('aria-expanded', 'false');
+      matches = [];
+      active = -1;
+    };
+    const highlight = (i) => {
+      active = i;
+      [...list.children].forEach((li, n) => li.setAttribute('aria-selected', n === i ? 'true' : 'false'));
+    };
+    const choose = (song) => {
+      close();
+      search.value = '';
+      commit({ mode: 'list', songId: song.id, title: song.title, notes: current().notes });
+    };
+    const byHand = (title) => {
+      close();
+      search.value = '';
+      commit({ mode: 'own', title, notes: current().notes });
+      q(title ? '.fd-artist' : '.fd-title').focus();
+    };
+    search.addEventListener('input', () => {
+      const text = search.value.trim().toLowerCase();
+      list.innerHTML = '';
+      if (!text) { close(); return; }
+      // Titles that start with what's typed first, then any other match.
+      const starts = (x) => (x.title.toLowerCase().startsWith(text) ? 0 : 1);
+      matches = state.library.filter((x) => x.title.toLowerCase().includes(text))
+        .sort((a, b) => starts(a) - starts(b) || a.title.localeCompare(b.title))
+        .slice(0, 8);
+      matches.forEach((song) => {
+        const li = el('li', 'fd-option', song.title);
+        li.setAttribute('role', 'option');
+        li.addEventListener('mousedown', (e) => e.preventDefault());
+        li.addEventListener('click', () => choose(song));
+        list.appendChild(li);
+      });
+      if (!matches.length) {
+        const li = el('li', 'fd-none', 'Not in the library. ');
+        const own = el('button', null, 'Name it by hand');
+        own.addEventListener('mousedown', (e) => e.preventDefault());
+        own.addEventListener('click', () => byHand(search.value.trim()));
+        li.appendChild(own);
+        list.appendChild(li);
+      }
+      list.classList.remove('hidden');
+      search.setAttribute('aria-expanded', 'true');
+      highlight(matches.length ? 0 : -1);
+    });
+    search.addEventListener('blur', close);
+    search.addEventListener('keydown', (e) => {
+      const n = matches.length;
+      if (list.classList.contains('hidden')) return;
+      if (e.key === 'ArrowDown' && n) { e.preventDefault(); highlight((active + 1) % n); }
+      else if (e.key === 'ArrowUp' && n) { e.preventDefault(); highlight((active - 1 + n) % n); }
+      else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(matches[active]); }
+      else if (e.key === 'Escape') close();
+    });
+    q('.fd-clear').addEventListener('click', () => commit({ notes: current().notes }));
+    q('.fd-mode').addEventListener('click', () => {
+      if (current().mode === 'own') {
+        commit({ notes: current().notes });
+        search.focus();
+      } else {
+        byHand(search.value.trim());
+      }
+    });
+    // Typing is kept as it goes; the setlist follows when a box is left.
+    const keep = (field, input) => {
+      input.addEventListener('input', () => {
+        doc()[key] = { ...current(), [field]: input.value };
+        save();
+      });
+      input.addEventListener('change', () => commit({ ...current(), from: 'band' }));
+    };
+    keep('title', q('.fd-title'));
+    keep('artist', q('.fd-artist'));
+    keep('notes', q('.fd-notes'));
+  }
 
   function openEditor(song, item) {
     editing = song || null;
@@ -1210,6 +1484,14 @@
     d.clientPicksFrom = data.couple || '';
     d.clientPicksWhen = data.at || Date.now();
     d.clientFirstDance = data.firstDance || '';
+    d.clientFatherDaughter = data.fatherDaughter || '';
+    // Their dances fill the gig's fields. Sent without one, a dance they
+    // chose before is taken back; one the band set stays.
+    for (const key of Object.keys(DANCES)) {
+      const theirs = danceFromPicks(typeof data[key] === 'string' ? { custom: true, title: data[key] } : data[key]);
+      if (theirs) setDance(d, key, theirs);
+      else if (d[key] && d[key].from === 'couple') setDance(d, key, null);
+    }
     // Lines already on the setlist catch up: a PLEASE PLAY ticks req.
     // Nothing is ever unticked - a request made in person stays made.
     let ticked = 0;
@@ -1298,14 +1580,15 @@
 
   function songCellHtml(song, item) {
     let t = esc(song.title + SetlistSheet.tagsOf(song, item));
-    if (item.requested || item.firstDance) t = '<b>' + t + '</b>';
+    if (item.requested || item.firstDance || item.fatherDaughter) t = '<b>' + t + '</b>';
     if (item.firstDance) t = '<span style="color:#7a3fb8">' + t + '</span>';
     else if (song.isNew) t = '<span style="color:#c22c2c">' + t + '</span>';
     return t;
   }
 
   // Colour does not survive a paste or a black-and-white printer, so every
-  // export says it in words too: "(1ST 💃)" and "🆕" (sheet.js).
+  // export says it in words too: "(FIRST DANCE)", "(FATHER & DAUGHTER
+  // DANCE)" and "🆕" (sheet.js).
   const danceTag = (item, song) => SetlistSheet.tagsOf(song || {}, item);
 
   // The Docs copy and the PDF are sheet.js's, shared with the band
@@ -1416,6 +1699,7 @@
   // --- Wiring --------------------------------------------------------------
 
   function wire() {
+    Object.keys(DANCES).forEach(wireDance);
     for (const [id, field] of headerFields) {
       const input = $('#' + id);
       input.dataset.field = field;
@@ -1638,7 +1922,8 @@
       ' sent their song picks'));
     text.appendChild(el('span', null, reply.please.length + ' PLEASE PLAY, ' +
       reply.no.length + ' HECK NO' +
-      (reply.firstDance ? '. First dance: ' + reply.firstDance : '') +
+      (reply.firstDance ? '. First dance: ' + danceText(reply.firstDance) : '') +
+      (reply.fatherDaughter ? '. Father & daughter dance: ' + danceText(reply.fatherDaughter) : '') +
       (result.ticked ? '. ' + result.ticked + ' setlist line' +
         (result.ticked === 1 ? '' : 's') + ' ticked req' : '') + '.'));
     bar.appendChild(text);

@@ -25,10 +25,16 @@
   const noteOf = (song, item) => [song.note, item.note].filter(Boolean).join(' · ');
 
   // Marks that survive a black-and-white printer: colour alone (purple,
-  // red) disappears, so the first dance and new songs say so in the title.
-  const DANCE_TAG = ' (1ST 💃)';
+  // red) disappears, so the dances and new songs say so after the title.
+  const DANCE_TAG = ' (FIRST DANCE)';
+  const FATHER_TAG = ' (FATHER & DAUGHTER DANCE)';
   const NEW_TAG = ' 🆕';
-  const tagsOf = (song, item) => (item.firstDance ? DANCE_TAG : '') + (song.isNew ? NEW_TAG : '');
+  const tagsOf = (song, item) => (item.firstDance ? DANCE_TAG : '') + (item.fatherDaughter ? FATHER_TAG : '') + (song.isNew ? NEW_TAG : '');
+  // A dance from its field at the top of the setlist, for the header:
+  // "Perfect", or "At Last (Etta James)" for one named by hand.
+  const danceLine = (fd) => (fd && fd.title
+    ? fd.title + (fd.mode === 'own' && fd.artist ? ' (' + fd.artist + ')' : '') : '');
+  const marked = (song, item) => !!(song.isNew || item.requested || item.firstDance || item.fatherDaughter);
 
   function filename(d, ext) {
     const base = ((d.header && d.header.couple) || 'setlist')
@@ -124,10 +130,10 @@
   // The marks after a title, as pieces of text and pictures.
   function tagPieces(song, item) {
     const out = [];
-    if (item.firstDance) {
-      const pic = emojiPic('💃');
-      out.push(pic ? { t: '(1ST ' } : { t: '(1ST DANCE)' });
-      if (pic) out.push({ pic }, { t: ')' });
+    if (item.firstDance) out.push({ t: DANCE_TAG.trim() });
+    if (item.fatherDaughter) {
+      if (out.length) out.push({ t: ' ' });
+      out.push({ t: FATHER_TAG.trim() });
     }
     if (song.isNew) {
       const pic = emojiPic('🆕');
@@ -207,19 +213,25 @@
       if (!song) continue;
       const part = partFor(song, item);
       n++;
-      const bold = song.isNew || item.requested || item.firstDance;
+      const bold = marked(song, item);
       pdf.setFontSize(s);
       pdf.setFont('helvetica', bold ? 'bold' : 'normal');
       const titleLines = pdf.splitTextToSize(song.title, titleW);
-      // The first dance and new song marks follow the title, on its last
-      // line if they fit, otherwise on a line of their own.
+      // The dance and new song marks follow the title, a little smaller: on
+      // its last line if they fit, otherwise on lines of their own.
       const tags = tagPieces(song, item);
+      const lastW = pdf.getTextWidth(titleLines[titleLines.length - 1]);
+      const tagSize = s * 0.78;
+      pdf.setFontSize(tagSize);
       const pieceW = (p) => (p.pic ? s : pdf.getTextWidth(p.t));
       const tagW = tags.reduce((w, p) => w + pieceW(p), 0);
-      const lastW = pdf.getTextWidth(titleLines[titleLines.length - 1]);
       const tagOwnLine = tags.length > 0 && lastW + s * 0.3 + tagW > titleW;
-      const titleRows = titleLines.length + (tagOwnLine ? 1 : 0);
-      lines = Math.max(lines, titleRows);
+      // Words only (no pictures) that are too long for one line wrap.
+      const tagLines = tagOwnLine && tagW > titleW && tags.every((p) => p.t)
+        ? pdf.splitTextToSize(tags.map((p) => p.t).join(''), titleW) : null;
+      pdf.setFontSize(s);
+      const titleRows = titleLines.length + (tagOwnLine ? (tagLines ? tagLines.length : 1) : 0);
+      lines = Math.max(lines, titleLines.length);
       const note = noteOf(song, item);
       pdf.setFont('helvetica', 'italic');
       pdf.setFontSize(noteSize);
@@ -248,14 +260,20 @@
       if (draw) pdf.setTextColor(...(item.firstDance ? PURPLE : song.isNew ? RED : INK));
       for (const l of titleLines) { text(l, titleX, s); y += line; }
       if (tags.length) {
-        if (!tagOwnLine) y -= line;
-        let x = tagOwnLine ? titleX : titleX + lastW + s * 0.3;
-        for (const p of tags) {
-          if (draw && p.pic) pdf.addImage(p.pic, 'PNG', x, y + s * 0.08, s * 0.92, s * 0.92);
-          else if (p.t) text(p.t, x, s);
-          x += pieceW(p);
+        pdf.setFontSize(tagSize);
+        if (tagLines) {
+          for (const l of tagLines) { text(l, titleX, s); y += line; }
+        } else {
+          if (!tagOwnLine) y -= line;
+          let x = tagOwnLine ? titleX : titleX + lastW + s * 0.3;
+          for (const p of tags) {
+            if (draw && p.pic) pdf.addImage(p.pic, 'PNG', x, y + s * 0.08, s * 0.92, s * 0.92);
+            else if (p.t) text(p.t, x, s);
+            x += pieceW(p);
+          }
+          y += line;
         }
-        y += line;
+        pdf.setFontSize(s);
       }
       if (noteLines.length) {
         pdf.setFont('helvetica', 'italic');
@@ -302,6 +320,7 @@
     const meta = [
       ['Venue', h.venue], ['Date', h.date], ['Crew', h.crew], ['Sound', h.sound],
       ['Point of contact', h.contact], ['MC', h.mc],
+      ['First dance', danceLine(d.firstDance)], ['Father & daughter dance', danceLine(d.fatherDaughter)],
     ].filter(([, v]) => v).map(([k, v]) => [k.toUpperCase() + ': ', String(v)]);
     const widthOf = ([k, v]) => {
       pdf.setFont('helvetica', 'bold');
@@ -445,7 +464,7 @@
 
   function songCellHtml(song, item) {
     let t = esc(song.title + tagsOf(song, item));
-    if (item.requested || item.firstDance) t = '<b>' + t + '</b>';
+    if (item.requested || item.firstDance || item.fatherDaughter) t = '<b>' + t + '</b>';
     if (item.firstDance) t = '<span style="color:#7a3fb8">' + t + '</span>';
     else if (song.isNew) t = '<span style="color:#c22c2c">' + t + '</span>';
     return t;
@@ -471,6 +490,7 @@
       ['Venue', h.venue], ['Date', h.date],
       ['Crew', h.crew], ['Sound', h.sound],
       ['Point of contact', h.contact], ['MC', h.mc],
+      ['First dance', danceLine(d.firstDance)], ['Father & daughter dance', danceLine(d.fatherDaughter)],
     ].filter(([, v]) => v);
     for (const [k, v] of meta) {
       html += '<p><b>' + k + ':</b> ' + esc(v) + '</p>';

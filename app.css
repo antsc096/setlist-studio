@@ -215,6 +215,62 @@ main > * { min-width: 0; }
   transition: border-color .15s ease;
 }
 .h-grid input:focus { border-bottom-color: var(--accent); }
+
+/* The dances: like the couple's form. Search the library, or name a song by
+   hand ("Not in the library?"), with notes beside it. */
+.h-dance { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 0; }
+.h-dance-label {
+  flex: none; width: 170px;
+  font-size: 10.5px; font-weight: 600; color: var(--ink-mute);
+  text-transform: uppercase; letter-spacing: .07em;
+}
+.h-dance input {
+  flex: 1; min-width: 0; border: none; outline: none;
+  border-bottom: 1px solid var(--line);
+  font: inherit; font-size: 13.5px; font-weight: 450; padding: 3px 0;
+  background: transparent; transition: border-color .15s ease;
+}
+.h-dance input:focus { border-bottom-color: var(--accent); }
+.fd-main { flex: 3; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.fd-pick { flex: 1; min-width: 0; position: relative; display: flex; }
+.fd-own { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.fd-own .h-and { flex: none; font-size: 13px; color: var(--ink-dim); }
+.h-dance .fd-notes { flex: 2; }
+.fd-chosen {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px;
+  padding: 3px 4px 3px 10px; border-radius: 20px;
+  background: var(--dance-soft); color: var(--dance);
+}
+.fd-song { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 650;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fd-song span { font-weight: 450; color: var(--ink-dim); margin-left: 6px; }
+.fd-clear {
+  flex: none; border: none; background: none; color: var(--dance);
+  font-size: 16px; line-height: 1; padding: 2px 6px; border-radius: 20px;
+}
+.fd-clear:hover { background: rgba(122, 63, 184, .12); }
+.fd-mode {
+  flex: none; border: none; background: none; padding: 2px 0;
+  color: var(--accent-deep); font-size: 12px; font-weight: 600;
+}
+.fd-mode:hover { text-decoration: underline; }
+.fd-options {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+  list-style: none; margin: 0; padding: 4px;
+  background: var(--paper); border: 1px solid var(--line);
+  border-radius: var(--radius-s); box-shadow: var(--shadow-2);
+  max-height: 280px; overflow-y: auto;
+}
+.fd-option {
+  padding: 6px 9px; border-radius: 6px; cursor: pointer;
+  font-size: 13.5px; font-weight: 550;
+}
+.fd-option[aria-selected="true"], .fd-option:hover { background: var(--dance-soft); color: var(--dance); }
+.fd-none { padding: 6px 9px; font-size: 13px; color: var(--ink-dim); }
+.fd-none button {
+  border: none; background: none; padding: 0; font: inherit;
+  color: var(--accent-deep); font-weight: 600; text-decoration: underline;
+}
 #hNotes {
   width: 100%; border: 1px solid transparent; outline: none; resize: vertical;
   background: var(--well); border-radius: 9px; padding: 10px 12px;
@@ -364,8 +420,12 @@ main > * { min-width: 0; }
    one line nobody can afford to misread. */
 .entry.first-dance { background: var(--dance-soft); }
 .entry .song .title.first-dance { color: var(--dance); font-weight: 700; }
-.entry.first-dance .flags .dance-l { color: var(--dance); }
 .entry.first-dance .key { background: rgba(255, 255, 255, .7); }
+/* The father and daughter dance: bold, on the same soft ground, but not the
+   first dance's purple. */
+.entry.father-daughter { background: var(--dance-soft); }
+.entry .song .title.father-daughter { font-weight: 700; }
+
 .entry .key {
   min-width: 40px; text-align: center; flex: none;
   font-weight: 650; font-size: 12.5px;
@@ -631,6 +691,9 @@ button.ghost.wide:hover {
   main { grid-template-columns: 1fr; padding: 10px; }
   .paper { padding: 20px 16px; border-radius: var(--radius); }
   .h-grid { grid-template-columns: 1fr 1fr; }
+  .h-dance { flex-wrap: wrap; margin-top: 10px; }
+  .h-dance-label { width: 100%; }
+  .fd-main, .h-dance .fd-notes { flex: 1 1 100%; }
   .entry .singer { display: none; }
   /* Three flags and a key leave nothing for the song title at this width,
      so the flags drop to their own line underneath it. */

@@ -64,6 +64,51 @@
           <label>Couple's first names <input id="hNames" autocomplete="off"
             placeholder="e.g. Lisa & Andrew"></label>
         </div>
+        <!-- The dances: search the library (it fills in as you type), or
+             name a song by hand with its artist, plus notes. Each marks its
+             song's line in the setlist. -->
+        <div class="h-dance" data-dance="firstDance">
+          <span class="h-dance-label">First dance</span>
+          <div class="fd-main">
+            <div class="fd-pick">
+              <input class="fd-search" autocomplete="off" placeholder="Search the library"
+                role="combobox" aria-autocomplete="list" aria-expanded="false" aria-label="First dance: search the library">
+              <ul class="fd-options hidden" role="listbox" aria-label="Matching songs"></ul>
+            </div>
+            <div class="fd-chosen hidden">
+              <span class="fd-song"></span>
+              <button class="fd-clear" title="Choose a different song" aria-label="Clear the first dance">×</button>
+            </div>
+            <div class="fd-own hidden">
+              <input class="fd-title" autocomplete="off" placeholder="Song" aria-label="First dance: song">
+              <span class="h-and">by</span>
+              <input class="fd-artist" autocomplete="off" placeholder="Artist" aria-label="First dance: artist">
+            </div>
+            <button class="fd-mode">Not in the library?</button>
+          </div>
+          <input class="fd-notes" autocomplete="off" placeholder="Notes, e.g. first verse and chorus only" aria-label="First dance: notes">
+        </div>
+        <div class="h-dance" data-dance="fatherDaughter">
+          <span class="h-dance-label">Father &amp; daughter dance</span>
+          <div class="fd-main">
+            <div class="fd-pick">
+              <input class="fd-search" autocomplete="off" placeholder="Search the library"
+                role="combobox" aria-autocomplete="list" aria-expanded="false" aria-label="Father &amp; daughter dance: search the library">
+              <ul class="fd-options hidden" role="listbox" aria-label="Matching songs"></ul>
+            </div>
+            <div class="fd-chosen hidden">
+              <span class="fd-song"></span>
+              <button class="fd-clear" title="Choose a different song" aria-label="Clear the father and daughter dance">×</button>
+            </div>
+            <div class="fd-own hidden">
+              <input class="fd-title" autocomplete="off" placeholder="Song" aria-label="Father &amp; daughter dance: song">
+              <span class="h-and">by</span>
+              <input class="fd-artist" autocomplete="off" placeholder="Artist" aria-label="Father &amp; daughter dance: artist">
+            </div>
+            <button class="fd-mode">Not in the library?</button>
+          </div>
+          <input class="fd-notes" autocomplete="off" placeholder="Notes, e.g. first verse and chorus only" aria-label="Father &amp; daughter dance: notes">
+        </div>
         <div id="hPicks" class="h-picks hidden"></div>
         <div class="h-grid">
           <label>Venue <input id="hVenue" autocomplete="off"></label>
