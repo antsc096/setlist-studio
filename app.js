@@ -96,7 +96,224 @@
   }
 
   function save() {
+    if (hub) { scheduleHubSave(); return; }
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  }
+
+  // --- The hub's database -------------------------------------------------
+  //
+  // Opened inside the band manager hub (at /studio/), the setlists live in
+  // the hub's database, never this browser: every device sees the same
+  // ones, and the band's gig pages read them. Each change goes up a moment
+  // after it's made. A save from setlists someone else has changed since is
+  // refused, and the newer ones load instead. Standalone (GitHub Pages)
+  // there's no hub, and everything stays in this browser as before.
+  const IN_HUB = /^\/studio(\/|$)/.test(location.pathname);
+  const HUB_API = '/api/admin/studio';
+  const MOVED_KEY = 'setlist-studio.moved-to-hub';
+  let hub = null;  // { savedAt } once the hub's setlists are loaded
+  let hubTimer = null;
+  let hubBusy = false;
+  let hubAgain = false;
+
+  // Opened from a gig in the hub (#gig=ID, with &doc=ID to link a setlist
+  // that has no gig yet): that gig's own setlist, made from its details
+  // when it has none. The hub chooses the gig, so the picker and New,
+  // Duplicate and Delete aren't shown.
+  const EMBED = new URLSearchParams(location.search).has('embed');
+  const opened = new URLSearchParams(location.hash.slice(1));
+  const GIG = IN_HUB ? opened.get('gig') : null;
+  const LINK_DOC = opened.get('doc');
+
+  const hubGet = () => fetch(HUB_API, { credentials: 'same-origin', cache: 'no-store' })
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+
+  function scheduleHubSave() {
+    clearTimeout(hubTimer);
+    hubTimer = setTimeout(hubSave, 700);
+  }
+
+  function hubSave() {
+    clearTimeout(hubTimer);
+    hubTimer = null;
+    if (hubBusy) { hubAgain = true; return; }
+    hubBusy = true;
+    const body = JSON.stringify(Object.assign({}, state, { baseSavedAt: hub.savedAt }));
+    fetch(HUB_API, {
+      method: 'PUT', credentials: 'same-origin', body,
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: body.length < 60000,
+    }).then((r) => r.json().catch(() => ({})).then((data) => {
+      if (r.ok) { hub.savedAt = state.savedAt = data.savedAt; return; }
+      if (r.status === 409 && data.current) {
+        hubAgain = false;
+        adoptHub(data.current);
+        toast('These setlists were just changed on another device, so they\'ve been reloaded. Make your last change again.');
+        return;
+      }
+      throw new Error(data.error || r.status);
+    })).catch(() => {
+      toast('Not saved yet: can\'t reach the hub. Trying again…');
+      setTimeout(scheduleHubSave, 5000);
+    }).then(() => {
+      hubBusy = false;
+      if (hubAgain) { hubAgain = false; hubSave(); }
+    });
+  }
+
+  // Someone else's newer setlists, in place of these. This device stays
+  // on the setlist it had open.
+  function adoptHub(value) {
+    const mine = state && state.activeDocId;
+    state = value;
+    migrate();
+    if (mine && state.docs.some((d) => d.id === mine)) state.activeDocId = mine;
+    hub.savedAt = value.savedAt || 0;
+    renderAll();
+    if (GIG) openGig().then((changed) => { if (changed) { save(); renderAll(); } });
+  }
+
+  // Changes saved on another device, picked up when this one comes back to
+  // the foreground (not while something's being typed or saved).
+  function hubRefresh() {
+    if (!hub || document.hidden || hubTimer || hubBusy) return;
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName)) return;
+    hubGet().then((value) => {
+      if (value && value.savedAt && value.savedAt !== hub.savedAt && !hubTimer && !hubBusy) adoptHub(value);
+    }).catch(() => {});
+  }
+
+  // What this browser kept before the hub did, if anything.
+  function readLocal() {
+    try {
+      const local = JSON.parse(localStorage.getItem(STORE_KEY));
+      if (!local || !Array.isArray(local.docs) || !Array.isArray(local.library)) return null;
+      const keep = state;
+      state = local;
+      migrate();
+      state = keep;
+      return local;
+    } catch (e) { return null; }
+  }
+
+  const songsIn = (d) => d.sets.reduce((n, set) =>
+    n + set.items.filter((i) => !i.brk && !i.noteRow).length, 0);
+
+  // Setlists made in this browser while Setlist Manager kept them here
+  // join the hub's, once per browser, so nothing made here is lost: any
+  // the hub doesn't have, and a copy of any it has in another version,
+  // marked as from this device. Songs they use that the hub's library
+  // doesn't have come with them.
+  function mergeLocal(local) {
+    let added = 0;
+    const byTitle = new Map(state.library.map((s) => [normTitle(s.title), s]));
+    const same = (a, b) => JSON.stringify([a.header, a.sets]) === JSON.stringify([b.header, b.sets]);
+    for (const d of local.docs) {
+      if (!songsIn(d)) continue;
+      const there = state.docs.find((x) => x.id === d.id);
+      if (there && same(there, d)) continue;
+      const copy = JSON.parse(JSON.stringify(d));
+      if (there || (copy.gigId && state.docs.some((x) => x.gigId === copy.gigId))) {
+        copy.id = uid();
+        delete copy.gigId;
+        copy.header.couple = (copy.header.couple || 'Untitled') + ' (from this device)';
+      }
+      for (const set of copy.sets) {
+        set.items = set.items.filter((item) => {
+          if (item.brk || item.noteRow) return true;
+          const mine = local.library.find((s) => s.id === item.songId);
+          if (!mine) return false;
+          let song = state.library.find((s) => s.id === mine.id) || byTitle.get(normTitle(mine.title));
+          if (!song) {
+            song = JSON.parse(JSON.stringify(mine));
+            state.library.push(song);
+            byTitle.set(normTitle(song.title), song);
+          }
+          const part = mine.parts.find((p) => p.id === item.partId);
+          let match = part && (song.parts.find((p) => p.id === part.id) ||
+            song.parts.find((p) => p.singer === part.singer && p.key === part.key));
+          if (part && !match) { match = Object.assign({}, part); song.parts.push(match); }
+          item.songId = song.id;
+          if (match) item.partId = match.id; else delete item.partId;
+          return true;
+        });
+      }
+      state.docs.push(copy);
+      added++;
+    }
+    return added;
+  }
+
+  // The gig's setlist made the active one: linked, or made from the gig.
+  // Returns a promise of whether anything changed.
+  function openGig() {
+    let d = state.docs.find((x) => x.gigId === GIG);
+    let changed = false;
+    if (!d && LINK_DOC) {
+      d = state.docs.find((x) => x.id === LINK_DOC && !x.gigId);
+      if (d) { d.gigId = GIG; changed = true; }
+    }
+    if (d) {
+      state.activeDocId = d.id;
+      return Promise.resolve(changed);
+    }
+    return fetch('/api/admin/gigs/' + encodeURIComponent(GIG), { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null)).catch(() => null).then((g) => {
+        if (state.docs.some((x) => x.gigId === GIG)) return openGig();
+        const fresh = defaultDoc();
+        fresh.gigId = GIG;
+        if (g) {
+          fresh.header.couple = g.title || '';
+          fresh.header.names = (g.names || []).filter(Boolean).join(' & ');
+          fresh.header.venue = g.venue || '';
+          fresh.header.date = g.date ? new Date(g.date + 'T00:00').toLocaleDateString('en-AU',
+            { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '';
+        }
+        state.docs.push(fresh);
+        state.activeDocId = fresh.id;
+        return true;
+      });
+  }
+
+  function startHub() {
+    if (EMBED) document.body.classList.add('embedded');
+    hubGet().then((value) => {
+      const local = readLocal();
+      const fromHub = value && Array.isArray(value.docs) && Array.isArray(value.library);
+      if (fromHub) {
+        state = value;
+      } else {
+        // The hub's first setlists: this browser's, or a fresh start.
+        load();
+      }
+      const before = JSON.stringify(state);
+      migrate();
+      hub = { savedAt: (fromHub && value.savedAt) || 0 };
+      let moved = 0;
+      if (fromHub && local && !localStorage.getItem(MOVED_KEY)) moved = mergeLocal(local);
+      localStorage.setItem(MOVED_KEY, String(Date.now()));
+      return (GIG ? openGig() : Promise.resolve(false)).then((changed) => {
+        if (changed || !fromHub || JSON.stringify(state) !== before) hubSave();
+        renderAll();
+        ready();
+        if (moved) {
+          toast(moved + ' setlist' + (moved === 1 ? '' : 's') + ' saved only in this browser ' +
+            (moved === 1 ? 'is' : 'are') + ' now in the hub too.');
+        }
+      });
+    }).catch(() => {
+      document.body.classList.add('hub-down');
+      const msg = el('div', 'hub-down-msg');
+      msg.appendChild(el('b', null, 'Can\'t reach the hub\'s setlists.'));
+      msg.appendChild(el('span', null, 'Check the connection (or sign in to the hub again), then reload.'));
+      const again = el('button', 'primary', 'Reload');
+      again.addEventListener('click', () => location.reload());
+      msg.appendChild(again);
+      document.body.appendChild(msg);
+    });
+    window.addEventListener('pagehide', () => { if (hubTimer) hubSave(); });
+    document.addEventListener('visibilitychange', hubRefresh);
+    setInterval(hubRefresh, 30000);
   }
 
   const doc = () =>
@@ -1068,24 +1285,8 @@
 
   // --- Exports -------------------------------------------------------------
 
-  function docFilename(ext) {
-    const base = (doc().header.couple || 'setlist')
-      .replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
-    return (base || 'setlist') + '.' + ext;
-  }
-
-  function writeClipboard(html, text, done) {
-    if (navigator.clipboard && window.ClipboardItem) {
-      navigator.clipboard.write([new ClipboardItem({
-        'text/html': new Blob([html], { type: 'text/html' }),
-        'text/plain': new Blob([text], { type: 'text/plain' }),
-      })]).then(done, () => navigator.clipboard.writeText(text).then(done,
-        () => toast('Could not reach the clipboard.')));
-    } else {
-      navigator.clipboard.writeText(text).then(done,
-        () => toast('Could not reach the clipboard.'));
-    }
-  }
+  const writeClipboard = (html, text, done) => SetlistSheet.writeClipboard(html, text)
+    .then(done, () => toast('Could not reach the clipboard.'));
 
   const esc = (t) => String(t).replace(/&/g, '&amp;')
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -1102,119 +1303,12 @@
   // flavour of every export says it in words.
   const danceTag = (item) => (item.firstDance ? ' (first dance)' : '');
 
-  // Google Docs sizes a pasted table to its contents, so a table of short
-  // song titles ends up as a narrow strip floating on the page. Declaring a
-  // width per column fixes that: these add up to 600pt, the text column of
-  // an A4 page with the default margins, so the table always spans it.
-  const DOC_COLS = [36, 372, 72, 120];
-  const CELL = 'padding:4px 7px;border:1px solid #b8c1be;vertical-align:top;';
-  const cellStyle = (i) => 'width:' + DOC_COLS[i] + 'px;' + CELL;
-
-  // A formatted document for Google Docs: header lines, then one real
-  // table per set. Requested songs are bold, new songs red - no extra
-  // columns carrying what type can say.
+  // The Docs copy and the PDF are sheet.js's, shared with the band
+  // manager hub, so a setlist reads the same wherever it's printed.
   function copyForDocs() {
-    const d = doc();
-    let html = '<meta charset="utf-8">';
-    html += '<h1>' + esc(d.header.couple || 'Setlist') + '</h1>';
-    const meta = [
-      ['Venue', d.header.venue], ['Date', d.header.date],
-      ['Crew', d.header.crew], ['Sound', d.header.sound],
-      ['Point of contact', d.header.contact], ['MC', d.header.mc],
-    ].filter(([, v]) => v);
-    for (const [k, v] of meta) {
-      html += '<p><b>' + k + ':</b> ' + esc(v) + '</p>';
-    }
-    if (d.header.notes) {
-      html += '<p>' + esc(d.header.notes).replace(/\n/g, '<br>') + '</p>';
-    }
-    let text = (d.header.couple || 'Setlist') + '\n';
-    let anyRequested = false;
-    let anyDance = false;
-    let anyNew = false;
-    for (const set of d.sets) {
-      html += '<h2>' + esc(set.label) + '</h2>';
-      text += '\n' + set.label + '\n';
-      // Note lines live between the tables, never inside them: the table
-      // closes at a note, the note stands as its own paragraph, and a
-      // fresh table (same columns, no repeated header) picks the songs
-      // back up after it.
-      let tableOpen = false;
-      let headerDone = false;
-      const openTable = () => {
-        html += '<table style="width:100%;border-collapse:collapse;' +
-          'table-layout:fixed">' +
-          '<colgroup>' + DOC_COLS.map((w) =>
-            '<col style="width:' + w + 'px">').join('') + '</colgroup>';
-        if (!headerDone) {
-          html += '<tr>' + ['#', 'Song', 'Key', 'Singer'].map((h, i) =>
-            '<th style="' + cellStyle(i) +
-            'text-align:left;background:#eef2f1">' + h + '</th>').join('') +
-            '</tr>';
-          headerDone = true;
-        }
-        tableOpen = true;
-      };
-      const closeTable = () => {
-        if (tableOpen) { html += '</table>'; tableOpen = false; }
-      };
-      let n = 0;
-      for (const item of set.items) {
-        if (item.noteRow) {
-          if (!item.text) continue;
-          closeTable();
-          html += '<p style="margin:6px 0"><i style="color:#5c6a66">' +
-            esc(item.text) + '</i></p>';
-          text += '- ' + item.text + '\n';
-          continue;
-        }
-        if (!tableOpen) openTable();
-        if (item.brk) {
-          html += '<tr><td style="' + cellStyle(0) + '"></td>' +
-            '<td colspan="3" style="' + CELL + '"><i>' +
-            esc(item.label || 'Break') +
-            (item.minutes ? ' (' + item.minutes + ' min)' : '') +
-            '</i></td></tr>';
-          text += '- ' + (item.label || 'Break') + '\n';
-          continue;
-        }
-        const song = songById(item.songId);
-        if (!song) continue;
-        n++;
-        if (item.requested) anyRequested = true;
-        if (item.firstDance) anyDance = true;
-        if (song.isNew) anyNew = true;
-        const part = partFor(song, item);
-        const noteText = [song.note, item.note].filter(Boolean).join(' · ');
-        const note = noteText
-          ? ' <i style="color:#5c6a66">' + esc(noteText) + '</i>' : '';
-        html += '<tr><td style="' + cellStyle(0) + '">' + n + '</td>' +
-          '<td style="' + cellStyle(1) + '">' + songCellHtml(song, item) +
-          note + '</td><td style="' + cellStyle(2) + '"><b>' +
-          esc(part.key) + '</b></td><td style="' + cellStyle(3) + '">' +
-          esc(part.singer) + '</td></tr>';
-        text += n + '. ' + song.title + danceTag(item) + '  ' +
-          part.key + '  ' + part.singer + '\n';
-      }
-      closeTable();
-    }
-    // The same legend the PDF prints, so the artist reading the pasted
-    // doc knows what the colours and bold mean.
-    const legend = [];
-    if (anyRequested) legend.push('<b>bold</b> = requested by the couple');
-    if (anyDance) {
-      legend.push('<span style="color:#7a3fb8">purple</span> = first dance');
-    }
-    if (anyNew) {
-      legend.push('<span style="color:#c22c2c">red</span> = new song');
-    }
-    if (legend.length) {
-      html += '<p style="font-size:10px;color:#5c6a66"><i>' +
-        legend.join(' &nbsp;·&nbsp; ') + '</i></p>';
-      text += '\n' + legend.join(' · ').replace(/<[^>]+>/g, '') + '\n';
-    }
-    writeClipboard(html, text,
-      () => toast('Copied. Paste straight into a Google Doc.'));
+    SetlistSheet.copyDocs(doc(), state.library).then(
+      () => toast('Copied. Paste straight into a Google Doc.'),
+      () => toast('Could not reach the clipboard.'));
   }
 
   function copyForSheets() {
@@ -1286,182 +1380,9 @@
     }).catch(() => toast('That file is not a Setlist Studio backup.'));
   }
 
-  // The printed sheet: the same document, set in PDF. Mirrors the band's
-  // real sheet - header block, ruled set headings, numbered rows with key
-  // and singer columns - refined into consistent columns.
+  // The printed sheet: each set on its own page, as large as it fits.
   function exportPdf() {
-    const d = doc();
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
-    const pageW = pdf.internal.pageSize.getWidth();
-    const pageH = pdf.internal.pageSize.getHeight();
-    const margin = 48;
-    const colKey = pageW - margin - 120;
-    const colSinger = pageW - margin - 70;
-    let y = margin;
-
-    const ink = [29, 39, 36];
-    const dim = [92, 106, 102];
-    const red = [194, 44, 44];
-    const purple = [122, 63, 184];
-
-    const ensureRoom = (needed) => {
-      if (y + needed > pageH - margin) { pdf.addPage(); y = margin; }
-    };
-
-    pdf.setTextColor(...ink);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(20);
-    pdf.text(d.header.couple || 'Setlist', margin, y);
-    y += 10;
-    pdf.setDrawColor(...ink);
-    pdf.setLineWidth(1.2);
-    pdf.line(margin, y, pageW - margin, y);
-    y += 16;
-
-    pdf.setFontSize(10);
-    const meta = [
-      ['Venue', d.header.venue], ['Date', d.header.date],
-      ['Crew', d.header.crew], ['Sound', d.header.sound],
-      ['Point of contact', d.header.contact], ['MC', d.header.mc],
-    ].filter(([, v]) => v);
-    for (let i = 0; i < meta.length; i += 2) {
-      const pair = meta.slice(i, i + 2);
-      let x = margin;
-      for (const [label, value] of pair) {
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(label.toUpperCase() + ':', x, y);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(String(value),
-          x + pdf.getTextWidth(label.toUpperCase() + ': ') + 2, y);
-        x = margin + (pageW - margin * 2) / 2;
-      }
-      y += 14;
-    }
-
-    if (d.header.notes) {
-      y += 2;
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(...dim);
-      const lines = pdf.splitTextToSize(d.header.notes, pageW - margin * 2);
-      for (const line of lines) {
-        ensureRoom(12);
-        pdf.text(line, margin, y);
-        y += 12;
-      }
-      pdf.setTextColor(...ink);
-    }
-
-    let anyRequested = false;
-    let anyDance = false;
-    for (const set of d.sets) {
-      ensureRoom(46);
-      y += 18;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(13);
-      pdf.text(set.label, margin, y);
-      y += 5;
-      pdf.setLineWidth(0.8);
-      pdf.line(margin, y, pageW - margin, y);
-      y += 14;
-      pdf.setFontSize(11);
-
-      let n = 0;
-      for (const item of set.items) {
-        if (item.brk) {
-          ensureRoom(16);
-          pdf.setFont('helvetica', 'italic');
-          pdf.setTextColor(...dim);
-          pdf.text('— ' + (item.label || 'Break') +
-            (item.minutes ? ' (' + item.minutes + ' min)' : '') + ' —',
-            margin + 22, y);
-          pdf.setTextColor(...ink);
-          y += 15;
-          continue;
-        }
-        if (item.noteRow) {
-          if (!item.text) continue;
-          pdf.setFont('helvetica', 'italic');
-          pdf.setTextColor(...dim);
-          const noteLines =
-            pdf.splitTextToSize(item.text, pageW - margin * 2 - 22);
-          for (const line of noteLines) {
-            ensureRoom(16);
-            pdf.text(line, margin + 22, y);
-            y += 13;
-          }
-          pdf.setTextColor(...ink);
-          y += 2;
-          continue;
-        }
-        const song = songById(item.songId);
-        if (!song) continue;
-        const part = partFor(song, item);
-        const lineNote = [song.note, item.note].filter(Boolean).join(' · ');
-        ensureRoom(lineNote ? 27 : 16);
-        n++;
-
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(...dim);
-        pdf.text(String(n), margin + 14, y, { align: 'right' });
-
-        if (item.firstDance) pdf.setTextColor(...purple);
-        else if (song.isNew) pdf.setTextColor(...red);
-        else pdf.setTextColor(...ink);
-        const bold = song.isNew || item.requested || item.firstDance;
-        if (item.requested) anyRequested = true;
-        if (item.firstDance) anyDance = true;
-        pdf.setFont('helvetica', bold ? 'bold' : 'normal');
-        const maxTitleW = colKey - 12 - (margin + 22);
-        let title = song.title;
-        while (pdf.getTextWidth(title) > maxTitleW && title.length > 4) {
-          title = title.slice(0, -2).trimEnd() + '…';
-        }
-        pdf.text(title, margin + 22, y);
-
-        pdf.setFont('helvetica', 'bold');
-        pdf.setTextColor(...ink);
-        pdf.text(part.key, colKey, y);
-        pdf.setFont('helvetica', 'normal');
-        pdf.setTextColor(...dim);
-        pdf.text(part.singer, colSinger, y);
-        pdf.setTextColor(...ink);
-
-        if (lineNote) {
-          y += 11;
-          pdf.setFont('helvetica', 'italic');
-          pdf.setFontSize(9);
-          pdf.setTextColor(...dim);
-          pdf.text(lineNote, margin + 22, y);
-          pdf.setFontSize(11);
-          pdf.setTextColor(...ink);
-        }
-        y += 15;
-      }
-    }
-
-    y += 16;
-    ensureRoom(14);
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'italic');
-    pdf.setTextColor(...dim);
-    const legend = [];
-    if (anyRequested) legend.push('bold = requested by the couple');
-    if (anyDance) legend.push('purple = first dance');
-    if (state.library.some((s) => s.isNew &&
-        d.sets.some((set) => set.items.some((i) => i.songId === s.id)))) {
-      legend.push('red = new song');
-    }
-    if (legend.length) pdf.text(legend.join('   ·   '), margin, y);
-
-    const filename = docFilename('pdf');
-    const blob = pdf.output('blob');
-    const file = new File([blob], filename, { type: 'application/pdf' });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file], title: filename }).catch(() => {});
-    } else {
-      pdf.save(filename);
-    }
+    SetlistSheet.savePdf(doc(), state.library);
   }
 
   // --- Small helpers -------------------------------------------------------
@@ -1675,7 +1596,7 @@
     state.docs.some((d) => (d.shares || []).length);
 
   function checkInbox() {
-    if (inboxBusy || document.hidden || !waitingOnPicks()) return;
+    if (!state || inboxBusy || document.hidden || !waitingOnPicks()) return;
     inboxBusy = true;
     fetch(PICKS_INBOX_URL, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : []))
@@ -1731,9 +1652,14 @@
 
   // --- Boot ----------------------------------------------------------------
 
-  load();
   wire();
-  renderAll();
+  if (IN_HUB) {
+    startHub();
+  } else {
+    load();
+    renderAll();
+    ready();
+  }
 
   // A tapped reply link lands here as "#p=...". It arrives as a fresh load,
   // or as a bare hash change when the app is already open (an installed
@@ -1745,12 +1671,14 @@
     history.replaceState(null, '', location.pathname + location.search);
     if (picks) applyPicks(picks);
   }
-  importFromAddress();
-  window.addEventListener('hashchange', importFromAddress);
-
-  checkInbox();
-  setInterval(checkInbox, INBOX_EVERY_MS);
-  document.addEventListener('visibilitychange', checkInbox);
+  // Once the setlists are loaded (from the hub, that's a moment later).
+  function ready() {
+    importFromAddress();
+    window.addEventListener('hashchange', importFromAddress);
+    checkInbox();
+    setInterval(checkInbox, INBOX_EVERY_MS);
+    document.addEventListener('visibilitychange', checkInbox);
+  }
 
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').then((reg) => {

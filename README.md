@@ -116,6 +116,22 @@ The page works today at the GitHub Pages address. To serve it from
 Do not attach the custom domain to *this* repo: that would move the
 manager's address too, and every installed copy would start empty.
 
+## Inside the band manager hub
+
+The band's hub serves this same app at `/studio/`. There it doesn't keep
+anything in the browser: the setlists and library live in the hub's
+database (`/api/admin/studio`), so every device and every band member
+sees the same ones. Each change saves a moment after it's made; a save
+from setlists someone else has changed since is refused and the newer
+ones reload. Opened from a gig (`/studio/?embed=1#gig=ID`), it shows that
+gig's own setlist, made from the gig's details if it has none, without
+the picker or New/Duplicate/Delete. The first time a browser opens it,
+any setlists that browser had kept for itself are added to the hub's.
+
+The PDF and the Google Docs copy are in `sheet.js`, which the hub also
+loads for band members' gig pages, so a setlist prints the same wherever
+it comes from: each set on its own page, in the largest type that fits.
+
 ## Updates
 
 Nobody ever needs to clear a cache. The service worker precaches one

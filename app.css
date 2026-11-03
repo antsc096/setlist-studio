@@ -687,3 +687,20 @@ button.ghost.wide:hover {
      so put it back or the printed sheet loses a whole column. */
   .entry .singer { display: block !important; width: auto; min-width: 66px; }
 }
+
+/* Inside the hub: the hub chooses the gig, so there's no picking or
+   making setlists here; and when the hub can't be reached, nothing to
+   edit (a copy kept in the browser would drift from the real one). */
+.embedded #docPicker, .embedded #newDoc, .embedded #dupDoc, .embedded #delDoc { display: none !important; }
+.hub-down main, .hub-down #libToggle { visibility: hidden; }
+.hub-down-msg {
+  position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%);
+  z-index: 80; display: grid; gap: 8px; justify-items: start;
+  width: min(380px, calc(100% - 32px));
+  background: #fff; color: var(--ink); padding: 18px 20px; border-radius: 12px;
+  box-shadow: var(--shadow-2); font-size: 14px;
+}
+.hub-down-msg button {
+  background: var(--accent); border: none; color: #fff;
+  font-weight: 650; padding: 8px 16px; border-radius: 8px; margin-top: 4px;
+}
