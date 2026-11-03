@@ -285,6 +285,12 @@
         if (state.docs.some((x) => x.gigId === GIG)) return openGig();
         const fresh = defaultDoc();
         fresh.gigId = GIG;
+        // A rehearsal's list is the songs to rehearse, not four sets.
+        if (g && g.kind === 'rehearsal') {
+          fresh.sets = [{ label: 'SONGS TO REHEARSE', items: [] }];
+          fresh.numSets = 1;
+          fresh.songsPerSet = 30;
+        }
         if (g) {
           fresh.header.couple = g.title || '';
           fresh.header.names = (g.names || []).filter(Boolean).join(' & ');
@@ -304,6 +310,8 @@
     if (!GIG) return;
     fetch('/api/admin/gigs/' + encodeURIComponent(GIG), { credentials: 'same-origin' })
       .then((r) => (r.ok ? r.json() : null)).then((g) => {
+        // The dances are a wedding's (or a gig whose kind isn't set yet).
+        document.body.classList.toggle('no-dances', !!(g && g.kind && g.kind !== 'wedding' && g.kind !== 'unset'));
         const picks = g && g.picks;
         const d = state.docs.find((x) => x.gigId === GIG);
         if (!picks || !d) return;

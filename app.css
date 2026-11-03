@@ -219,6 +219,7 @@ main > * { min-width: 0; }
 /* The dances: like the couple's form. Search the library, or name a song by
    hand ("Not in the library?"), with notes beside it. */
 .h-dance { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 0; }
+.no-dances .h-dance { display: none; }
 .h-dance-label {
   flex: none; width: 170px;
   font-size: 10.5px; font-weight: 600; color: var(--ink-mute);
