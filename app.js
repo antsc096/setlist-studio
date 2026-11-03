@@ -1681,7 +1681,14 @@
     document.addEventListener('visibilitychange', checkInbox);
   }
 
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  // Inside the hub there's no offline copy at all: the setlists are the
+  // hub's, and Setlist Manager must always be the latest version (the hub
+  // also clears out any copy an older version cached).
+  if (IN_HUB && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => {
+      if (/\/studio\/$/.test(new URL(r.scope).pathname)) r.unregister();
+    })).catch(() => {});
+  } else if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').then((reg) => {
       // A fresh install stays silent; only an update to an app already
       // running gets the banner, once the new version is ready to serve.
