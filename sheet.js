@@ -24,6 +24,12 @@
   };
   const noteOf = (song, item) => [song.note, item.note].filter(Boolean).join(' · ');
 
+  // Marks that survive a black-and-white printer: colour alone (purple,
+  // red) disappears, so the first dance and new songs say so in the title.
+  const DANCE_TAG = ' (1ST 💃)';
+  const NEW_TAG = ' 🆕';
+  const tagsOf = (song, item) => (item.firstDance ? DANCE_TAG : '') + (song.isNew ? NEW_TAG : '');
+
   function filename(d, ext) {
     const base = ((d.header && d.header.couple) || 'setlist')
       .replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase();
@@ -92,6 +98,43 @@
       ]).then(([font, logo]) => { brand = { font, logo }; });
     }
     return brandLoad;
+  }
+
+  // The PDF's fonts have no emoji, so each is drawn as a small picture (from
+  // the device's own emoji font). With no emoji font, the words stand alone.
+  const emojiPics = {};
+  function emojiPic(ch) {
+    if (ch in emojiPics) return emojiPics[ch];
+    let pic = null;
+    try {
+      const px = 96;
+      const c = document.createElement('canvas');
+      c.width = c.height = px;
+      const g = c.getContext('2d');
+      g.textAlign = 'center';
+      g.textBaseline = 'middle';
+      g.font = (px * 0.8) + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+      g.fillText(ch, px / 2, px / 2 + px * 0.04);
+      const a = g.getImageData(0, 0, px, px).data;
+      for (let i = 3; i < a.length; i += 4) if (a[i]) { pic = c.toDataURL('image/png'); break; }
+    } catch (e) { /* no canvas: words only */ }
+    emojiPics[ch] = pic;
+    return pic;
+  }
+  // The marks after a title, as pieces of text and pictures.
+  function tagPieces(song, item) {
+    const out = [];
+    if (item.firstDance) {
+      const pic = emojiPic('💃');
+      out.push(pic ? { t: '(1ST ' } : { t: '(1ST DANCE)' });
+      if (pic) out.push({ pic }, { t: ')' });
+    }
+    if (song.isNew) {
+      const pic = emojiPic('🆕');
+      if (out.length) out.push({ t: ' ' });
+      out.push(pic ? { pic } : { t: 'NEW' });
+    }
+    return out;
   }
 
   // The heading font where it's loaded (it has no long dashes).
@@ -168,12 +211,20 @@
       pdf.setFontSize(s);
       pdf.setFont('helvetica', bold ? 'bold' : 'normal');
       const titleLines = pdf.splitTextToSize(song.title, titleW);
-      lines = Math.max(lines, titleLines.length);
+      // The first dance and new song marks follow the title, on its last
+      // line if they fit, otherwise on a line of their own.
+      const tags = tagPieces(song, item);
+      const pieceW = (p) => (p.pic ? s : pdf.getTextWidth(p.t));
+      const tagW = tags.reduce((w, p) => w + pieceW(p), 0);
+      const lastW = pdf.getTextWidth(titleLines[titleLines.length - 1]);
+      const tagOwnLine = tags.length > 0 && lastW + s * 0.3 + tagW > titleW;
+      const titleRows = titleLines.length + (tagOwnLine ? 1 : 0);
+      lines = Math.max(lines, titleRows);
       const note = noteOf(song, item);
       pdf.setFont('helvetica', 'italic');
       pdf.setFontSize(noteSize);
       const noteLines = note ? pdf.splitTextToSize(note, titleW) : [];
-      const rowH = pad * 2 + titleLines.length * line + (noteLines.length ? noteLines.length * noteSize * 1.22 - s * 0.12 : 0);
+      const rowH = pad * 2 + titleRows * line + (noteLines.length ? noteLines.length * noteSize * 1.22 - s * 0.12 : 0);
 
       if (draw && n % 2 === 0) {
         pdf.setFillColor(...SHADE);
@@ -196,6 +247,16 @@
       pdf.setFont('helvetica', bold ? 'bold' : 'normal');
       if (draw) pdf.setTextColor(...(item.firstDance ? PURPLE : song.isNew ? RED : INK));
       for (const l of titleLines) { text(l, titleX, s); y += line; }
+      if (tags.length) {
+        if (!tagOwnLine) y -= line;
+        let x = tagOwnLine ? titleX : titleX + lastW + s * 0.3;
+        for (const p of tags) {
+          if (draw && p.pic) pdf.addImage(p.pic, 'PNG', x, y + s * 0.08, s * 0.92, s * 0.92);
+          else if (p.t) text(p.t, x, s);
+          x += pieceW(p);
+        }
+        y += line;
+      }
       if (noteLines.length) {
         pdf.setFont('helvetica', 'italic');
         pdf.setFontSize(noteSize);
@@ -383,16 +444,12 @@
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   function songCellHtml(song, item) {
-    let t = esc(song.title);
+    let t = esc(song.title + tagsOf(song, item));
     if (item.requested || item.firstDance) t = '<b>' + t + '</b>';
     if (item.firstDance) t = '<span style="color:#7a3fb8">' + t + '</span>';
     else if (song.isNew) t = '<span style="color:#c22c2c">' + t + '</span>';
     return t;
   }
-
-  // Colour does not survive a paste into a plain-text field, so the text
-  // flavour says it in words.
-  const danceTag = (item) => (item.firstDance ? ' (first dance)' : '');
 
   // Google Docs sizes a pasted table to its contents, so a table of short
   // song titles ends up as a narrow strip floating on the page. Declaring a
@@ -480,7 +537,7 @@
           note + '</td><td style="' + cellStyle(2) + '"><b>' +
           esc(part.key) + '</b></td><td style="' + cellStyle(3) + '">' +
           esc(part.singer) + '</td></tr>';
-        text += n + '. ' + song.title + danceTag(item) + '  ' +
+        text += n + '. ' + song.title + tagsOf(song, item) + '  ' +
           part.key + '  ' + part.singer + '\n';
       }
       closeTable();
@@ -509,5 +566,5 @@
     return writeClipboard(html, text);
   };
 
-  window.SetlistSheet = { ready, savePdf, pdfUrl, buildPdf, copyDocs, docsCopy, writeClipboard, filename };
+  window.SetlistSheet = { ready, savePdf, pdfUrl, buildPdf, copyDocs, docsCopy, writeClipboard, filename, tagsOf };
 })();

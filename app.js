@@ -1297,16 +1297,16 @@
     .replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   function songCellHtml(song, item) {
-    let t = esc(song.title);
+    let t = esc(song.title + SetlistSheet.tagsOf(song, item));
     if (item.requested || item.firstDance) t = '<b>' + t + '</b>';
     if (item.firstDance) t = '<span style="color:#7a3fb8">' + t + '</span>';
     else if (song.isNew) t = '<span style="color:#c22c2c">' + t + '</span>';
     return t;
   }
 
-  // Colour does not survive a paste into a plain-text field, so the text
-  // flavour of every export says it in words.
-  const danceTag = (item) => (item.firstDance ? ' (first dance)' : '');
+  // Colour does not survive a paste or a black-and-white printer, so every
+  // export says it in words too: "(1ST 💃)" and "🆕" (sheet.js).
+  const danceTag = (item, song) => SetlistSheet.tagsOf(song || {}, item);
 
   // The Docs copy and the PDF are sheet.js's, shared with the band
   // manager hub, so a setlist reads the same wherever it's printed.
@@ -1339,7 +1339,7 @@
         if (!song) continue;
         const part = partFor(song, item);
         rows.push({ song, item, cells: [set.label, ++n,
-          song.title + danceTag(item),
+          song.title + danceTag(item, song),
           part.key, part.singer,
           [song.note, item.note].filter(Boolean).join(' · ')] });
       }
