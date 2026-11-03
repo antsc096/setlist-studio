@@ -282,6 +282,10 @@
     return y - top + 10;
   }
 
+  // "Updated 3 Nov 2026, 4:13 pm", when the setlist carries when it last changed.
+  const updatedText = (d) => (d.updatedAt ? 'Updated ' + new Date(d.updatedAt).toLocaleString('en-AU',
+    { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '');
+
   function buildPdf(d, library) {
     const songById = songsOf(library);
     const { jsPDF } = window.jspdf;
@@ -299,6 +303,7 @@
     if (marks.dance) legend.push('purple = first dance');
     if (marks.isNew) legend.push('red = new song');
     const running = [h.couple, h.date].filter(Boolean).join('  ·  ');
+    const updated = updatedText(d);
     const sets = d.sets.length ? d.sets : [{ label: '', items: [] }];
 
     sets.forEach((set, i) => {
@@ -335,7 +340,9 @@
       pdf.setFontSize(8);
       pdf.setTextColor(...DIM);
       if (legend.length) pdf.text(legend.join('   ·   '), MARGIN, pageH - MARGIN);
-      if (sets.length > 1) pdf.text((i + 1) + ' / ' + sets.length, pageW - MARGIN, pageH - MARGIN, { align: 'right' });
+      // Which version this is, for a sheet printed and carried to the gig.
+      const right = [updated, sets.length > 1 ? (i + 1) + ' / ' + sets.length : ''].filter(Boolean).join('   ·   ');
+      if (right) pdf.text(right, pageW - MARGIN, pageH - MARGIN, { align: 'right' });
     });
     return pdf;
   }
@@ -489,6 +496,10 @@
       html += '<p style="font-size:10px;color:#5c6a66"><i>' +
         legend.join(' &nbsp;·&nbsp; ') + '</i></p>';
       text += '\n' + legend.join(' · ').replace(/<[^>]+>/g, '') + '\n';
+    }
+    if (d.updatedAt) {
+      html += '<p style="font-size:10px;color:#5c6a66"><i>' + esc(updatedText(d)) + '</i></p>';
+      text += updatedText(d) + '\n';
     }
     return { html, text };
   }

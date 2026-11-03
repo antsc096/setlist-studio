@@ -144,7 +144,12 @@
       headers: { 'Content-Type': 'application/json' },
       keepalive: body.length < 60000,
     }).then((r) => r.json().catch(() => ({})).then((data) => {
-      if (r.ok) { hub.savedAt = state.savedAt = data.savedAt; return; }
+      if (r.ok) {
+        hub.savedAt = state.savedAt = data.savedAt;
+        // Each setlist's last change, as the hub stamped it.
+        for (const d of state.docs) if (data.updated && data.updated[d.id]) d.updatedAt = data.updated[d.id];
+        return;
+      }
       if (r.status === 409 && data.current) {
         hubAgain = false;
         adoptHub(data.current);
@@ -1306,7 +1311,8 @@
   // The Docs copy and the PDF are sheet.js's, shared with the band
   // manager hub, so a setlist reads the same wherever it's printed.
   function copyForDocs() {
-    SetlistSheet.copyDocs(doc(), state.library).then(
+    const d = hub ? Object.assign({}, doc(), { updatedAt: doc().updatedAt || state.savedAt }) : doc();
+    SetlistSheet.copyDocs(d, state.library).then(
       () => toast('Copied. Paste straight into a Google Doc.'),
       () => toast('Could not reach the clipboard.'));
   }
@@ -1382,7 +1388,9 @@
 
   // The printed sheet: each set on its own page, as large as it fits.
   function exportPdf() {
-    SetlistSheet.ready().then(() => SetlistSheet.savePdf(doc(), state.library));
+    // Inside the hub, the PDF says when the setlist last changed.
+    const d = hub ? Object.assign({}, doc(), { updatedAt: doc().updatedAt || state.savedAt }) : doc();
+    SetlistSheet.ready().then(() => SetlistSheet.savePdf(d, state.library));
   }
 
   // --- Small helpers -------------------------------------------------------
