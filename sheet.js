@@ -1,8 +1,10 @@
 /* The setlist as the band reads it: the PDF and the Google Docs copy.
    Shared by Setlist Manager and the band manager hub (where band members
    open their gigs' setlists), so a setlist prints and pastes the same
-   wherever it comes from. Needs vendor/jspdf.umd.min.js for the PDF.
+   wherever it comes from. Needs vendor/jspdf.umd.min.js for the PDF, and
+   brand/ beside it for the logo and heading font.
 
+   SetlistSheet.ready()                 loads the logo and font (a promise)
    SetlistSheet.savePdf(doc, library)   share or download the PDF
    SetlistSheet.pdfUrl(doc, library, print)  a link to it, to open
    SetlistSheet.copyDocs(doc, library)  copy for Google Docs (a promise)
@@ -51,19 +53,56 @@
   // page: the sheet is read from the floor in bad light. The first page
   // carries the event header above the first set; the others repeat the
   // event's name and date at the top. Long titles wrap rather than being
-  // cut, and every page ends with the legend.
+  // cut, every second song is lightly shaded so a key lines up with its
+  // song from a distance, and every page ends with the legend.
+  //
+  // Branded, without costing any reading size: the band's logo sits beside
+  // the title (or the running line), never above it, and the band's
+  // heading font is for the title and set headings only. Songs stay in a
+  // plain sans-serif.
 
   const INK = [29, 39, 36];
   const DIM = [92, 106, 102];
   const RED = [194, 44, 44];
   const PURPLE = [122, 63, 184];
+  const SHADE = [241, 238, 231];
   const MARGIN = 40;
   const MAX_SIZE = 28;
   const MIN_SIZE = 7;
   const FOOTER = 22;
+  const LOGO_RATIO = 216 / 102;
+
+  // The logo and heading font, loaded once (ready()). Until they are, or if
+  // they can't be, the PDF is the same in Helvetica without the logo.
+  let brand = {};
+  let brandLoad = null;
+  const here = (document.currentScript && document.currentScript.src) || location.href;
+  function ready() {
+    if (!brandLoad) {
+      const get = (path) => fetch(new URL(path, here)).then((r) => { if (!r.ok) throw new Error(r.status); return r.blob(); });
+      const dataUrl = (blob) => new Promise((ok, fail) => {
+        const fr = new FileReader();
+        fr.onload = () => ok(fr.result);
+        fr.onerror = fail;
+        fr.readAsDataURL(blob);
+      });
+      brandLoad = Promise.all([
+        get('brand/sugar-heading.ttf').then(dataUrl).then((u) => u.slice(u.indexOf(',') + 1)).catch(() => null),
+        get('brand/sugar-whiskey.png').then(dataUrl).catch(() => null),
+      ]).then(([font, logo]) => { brand = { font, logo }; });
+    }
+    return brandLoad;
+  }
+
+  // The heading font where it's loaded (it has no long dashes).
+  function headFont(pdf, size) {
+    if (brand.font) pdf.setFont('Chapaza', 'normal'); else pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(size);
+  }
+  const headText = (t) => (brand.font ? String(t).replace(/[–—]/g, '-') : String(t));
 
   // Lays out one set at type size s from `top`, drawing it when `draw`.
-  // Returns the height it takes.
+  // Returns the height it takes, and the most lines any song title took.
   function setBlock(pdf, set, s, top, songById, draw) {
     const pageW = pdf.internal.pageSize.getWidth();
     const left = MARGIN;
@@ -74,23 +113,21 @@
     const text = (t, x, size, opts) => { if (draw) pdf.text(t, x, y + size * 0.82, opts); };
 
     // The heading, ruled.
-    const head = s * 1.15;
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(head);
+    const head = s * 1.25;
+    headFont(pdf, head);
     if (draw) pdf.setTextColor(...INK);
-    const headLines = pdf.splitTextToSize(set.label || '', right - left);
-    for (const l of headLines) { text(l, left, head); y += head * 1.2; }
-    if (draw) { pdf.setDrawColor(...INK); pdf.setLineWidth(0.8); pdf.line(left, y + s * 0.1, right, y + s * 0.1); }
-    y += s * 0.55;
+    for (const l of pdf.splitTextToSize(headText(set.label || ''), right - left)) { text(l, left, head); y += head * 1.15; }
+    if (draw) { pdf.setDrawColor(...INK); pdf.setLineWidth(0.8); pdf.line(left, y + s * 0.12, right, y + s * 0.12); }
+    y += s * 0.5;
 
     // Columns sized to this set's keys and singers at this size.
     let keyW = 0;
     let singerW = 0;
+    pdf.setFontSize(s);
     for (const item of set.items) {
       if (item.brk || item.noteRow) continue;
       const part = partFor(songById(item.songId), item);
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(s);
       keyW = Math.max(keyW, pdf.getTextWidth(part.key || ''));
       pdf.setFont('helvetica', 'normal');
       singerW = Math.max(singerW, pdf.getTextWidth(part.singer || ''));
@@ -101,8 +138,10 @@
     const singerX = right - singerW;
     const keyX = singerX - (singerW ? gap : 0) - keyW;
     const titleW = Math.max(s * 4, keyX - gap - titleX);
+    const pad = s * 0.12;  // above and below each song, inside its shading
 
     let n = 0;
+    let lines = 1;
     for (const item of set.items) {
       if (item.brk) {
         pdf.setFont('helvetica', 'italic');
@@ -127,6 +166,22 @@
       n++;
       const bold = song.isNew || item.requested || item.firstDance;
       pdf.setFontSize(s);
+      pdf.setFont('helvetica', bold ? 'bold' : 'normal');
+      const titleLines = pdf.splitTextToSize(song.title, titleW);
+      lines = Math.max(lines, titleLines.length);
+      const note = noteOf(song, item);
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(noteSize);
+      const noteLines = note ? pdf.splitTextToSize(note, titleW) : [];
+      const rowH = pad * 2 + titleLines.length * line + (noteLines.length ? noteLines.length * noteSize * 1.22 - s * 0.12 : 0);
+
+      if (draw && n % 2 === 0) {
+        pdf.setFillColor(...SHADE);
+        pdf.rect(left - 4, y, right - left + 8, rowH, 'F');
+      }
+      y += pad;
+      const rowTop = y;
+      pdf.setFontSize(s);
       pdf.setFont('helvetica', 'normal');
       if (draw) pdf.setTextColor(...DIM);
       text(String(n), numX, s, { align: 'right' });
@@ -140,18 +195,24 @@
       }
       pdf.setFont('helvetica', bold ? 'bold' : 'normal');
       if (draw) pdf.setTextColor(...(item.firstDance ? PURPLE : song.isNew ? RED : INK));
-      for (const l of pdf.splitTextToSize(song.title, titleW)) { text(l, titleX, s); y += line; }
-      const note = noteOf(song, item);
-      if (note) {
+      for (const l of titleLines) { text(l, titleX, s); y += line; }
+      if (noteLines.length) {
         pdf.setFont('helvetica', 'italic');
         pdf.setFontSize(noteSize);
         if (draw) pdf.setTextColor(...DIM);
         y -= s * 0.12;
-        for (const l of pdf.splitTextToSize(note, titleW)) { text(l, titleX, noteSize); y += noteSize * 1.22; }
-        y += s * 0.12;
+        for (const l of noteLines) { text(l, titleX, noteSize); y += noteSize * 1.22; }
       }
+      y = rowTop - pad + rowH;
     }
-    return y - top;
+    return { h: y - top, lines };
+  }
+
+  // The band's logo, `h` high with its top at `top`, flush right.
+  function logo(pdf, top, h) {
+    if (!brand.logo) return;
+    const pageW = pdf.internal.pageSize.getWidth();
+    pdf.addImage(brand.logo, 'PNG', pageW - MARGIN - h * LOGO_RATIO, top, h * LOGO_RATIO, h);
   }
 
   // The event header for the first page. Returns its height.
@@ -160,10 +221,17 @@
     const width = pageW - MARGIN * 2;
     const h = d.header || {};
     let y = top;
+    // The title, with the logo beside it in the same band (no extra height).
+    const logoW = brand.logo ? 27 * LOGO_RATIO + 12 : 0;
     pdf.setTextColor(...INK);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(20);
-    if (draw) pdf.text(h.couple || 'Setlist', MARGIN, y + 17);
+    let size = 24;
+    headFont(pdf, size);
+    const title = headText(h.couple || 'Setlist');
+    while (size > 14 && pdf.getTextWidth(title) > width - logoW) headFont(pdf, --size);
+    if (draw) {
+      pdf.text(pdf.splitTextToSize(title, width - logoW)[0], MARGIN, y + 19);
+      logo(pdf, y - 5, 27);
+    }
     y += 26;
     if (draw) { pdf.setDrawColor(...INK); pdf.setLineWidth(1.2); pdf.line(MARGIN, y, pageW - MARGIN, y); }
     y += 8;
@@ -218,6 +286,10 @@
     const songById = songsOf(library);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+    if (brand.font) {
+      pdf.addFileToVFS('sugar-heading.ttf', brand.font);
+      pdf.addFont('sugar-heading.ttf', 'Chapaza', 'normal');
+    }
     const pageW = pdf.internal.pageSize.getWidth();
     const pageH = pdf.internal.pageSize.getHeight();
     const h = d.header || {};
@@ -234,19 +306,29 @@
       let top = MARGIN;
       if (i === 0) {
         top += headerBlock(pdf, d, top, true);
-      } else if (running) {
+      } else {
+        // The event's name and date, and a small logo, in one 20pt band.
         pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(9);
         pdf.setTextColor(...DIM);
-        pdf.text(running, MARGIN, top + 7);
+        if (running) pdf.text(running, MARGIN, top + 7);
+        logo(pdf, top - 6, 18);
         top += 20;
       }
-      // The largest size, in half points, that keeps the set on the page.
+      // The largest size, in half points, that keeps the set on the page
+      // with no title over two lines; a little smaller instead if that keeps
+      // every title on one line.
       const room = pageH - MARGIN - FOOTER - top;
-      let size = MIN_SIZE;
-      for (let s = MAX_SIZE; s >= MIN_SIZE; s -= 0.5) {
-        if (setBlock(pdf, set, s, top, songById, false) <= room) { size = s; break; }
+      let size = 0;
+      let unwrapped = 0;
+      for (let s = MAX_SIZE; s >= MIN_SIZE && !unwrapped; s -= 0.5) {
+        const fit = setBlock(pdf, set, s, top, songById, false);
+        if (fit.h > room || (fit.lines > 2 && s > MIN_SIZE)) continue;
+        if (!size) size = s;
+        if (fit.lines === 1) unwrapped = s;
       }
+      if (unwrapped >= size * 0.82) size = unwrapped;
+      size = size || MIN_SIZE;
       setBlock(pdf, set, size, top, songById, true);
 
       pdf.setFont('helvetica', 'italic');
@@ -416,5 +498,5 @@
     return writeClipboard(html, text);
   };
 
-  window.SetlistSheet = { savePdf, pdfUrl, buildPdf, copyDocs, docsCopy, writeClipboard, filename };
+  window.SetlistSheet = { ready, savePdf, pdfUrl, buildPdf, copyDocs, docsCopy, writeClipboard, filename };
 })();

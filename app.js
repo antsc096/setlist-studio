@@ -1382,7 +1382,7 @@
 
   // The printed sheet: each set on its own page, as large as it fits.
   function exportPdf() {
-    SetlistSheet.savePdf(doc(), state.library);
+    SetlistSheet.ready().then(() => SetlistSheet.savePdf(doc(), state.library));
   }
 
   // --- Small helpers -------------------------------------------------------
@@ -1653,6 +1653,7 @@
   // --- Boot ----------------------------------------------------------------
 
   wire();
+  SetlistSheet.ready();  // the PDF's logo and heading font, ahead of the first PDF
   if (IN_HUB) {
     startHub();
   } else {
