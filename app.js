@@ -229,7 +229,7 @@
   // doesn't have come with them.
   function mergeLocal(local) {
     let added = 0;
-    const byTitle = new Map(state.library.map((s) => [normTitle(s.title), s]));
+    const byTitle = titleIndex();
     const same = (a, b) => JSON.stringify([a.header, a.sets]) === JSON.stringify([b.header, b.sets]);
     for (const d of local.docs) {
       if (!songsIn(d)) continue;
@@ -438,7 +438,7 @@
     // this point stay deleted.
     if (!state.toppedUpFullRepertoire) {
       state.toppedUpFullRepertoire = true;
-      const have = new Set(state.library.map((s) => normTitle(s.title)));
+      const have = new Set(titleIndex().keys());
       for (const s of SEED_LIBRARY) {
         if (have.has(normTitle(s.title))) continue;
         have.add(normTitle(s.title));
@@ -853,6 +853,7 @@
         .map((p) => [p.key, p.singer].filter(Boolean).join(' '))
         .filter(Boolean);
       if (song.note) meta.push(song.note);
+      if (song.onSite === false) meta.push('Not on the website');
       t.appendChild(el('div', 'meta', meta.join(' · ')));
       li.appendChild(t);
 
@@ -937,12 +938,24 @@
 
   // --- The dances ------------------------------------------------------------
 
+  // Every library song by its title and by any title it was once known as
+  // (`aka`: a spelling the hub tidied), so picks, dances and the template
+  // made with an old spelling still find the song. A current title wins.
+  function titleIndex() {
+    const byTitle = new Map();
+    for (const s of state.library) byTitle.set(normTitle(s.title), s);
+    for (const s of state.library) {
+      for (const t of s.aka || []) if (!byTitle.has(normTitle(t))) byTitle.set(normTitle(t), s);
+    }
+    return byTitle;
+  }
+
   // The library song a title names. One the library has lost comes back
   // from the seed with its singers and keys; one the band has never had
   // joins with `unknown` (a dance named by hand: new, to learn).
   function librarySong(title, unknown) {
     const key = normTitle(title);
-    let song = state.library.find((x) => normTitle(x.title) === key);
+    let song = titleIndex().get(key);
     if (!song) {
       const seed = SEED_LIBRARY.find((x) => normTitle(x.title) === key);
       song = {
@@ -1167,6 +1180,8 @@
     editingItem = item || null;
     $('#seTitle').textContent = song ? 'Edit song' : 'New song';
     $('#seSongTitle').value = song ? song.title : '';
+    $('#seArtist').value = (song && song.artist) || '';
+    $('#seOnSite').checked = !song || song.onSite !== false;
     $('#sePartList').innerHTML = '';
     const parts = (song && song.parts.length) ? song.parts : [];
     if (parts.length) parts.forEach(addPartRow);
@@ -1224,9 +1239,12 @@
       if (!singer && !key) continue;
       parts.push({ id: row.dataset.id || uid(), singer, key });
     }
-    const values = { title, parts, note: $('#seNote').value.trim() };
+    const values = { title, parts, note: $('#seNote').value.trim(), artist: $('#seArtist').value.trim() };
     if (editing) Object.assign(editing, values);
-    else state.library.push(Object.assign({ id: uid(), isNew: false }, values));
+    else state.library.push(editing = Object.assign({ id: uid(), isNew: false }, values));
+    // On the website and the couples' song picks unless unticked.
+    if ($('#seOnSite').checked) delete editing.onSite;
+    else editing.onSite = false;
     if (editingItem) {
       const docNote = $('#seDocNote').value.trim();
       if (docNote) editingItem.note = docNote;
@@ -1356,8 +1374,7 @@
       (filled === 1 ? '' : 's') + " in this setlist with the band's " +
       'default template?')) return;
 
-    const byTitle = new Map();
-    for (const s of state.library) byTitle.set(normTitle(s.title), s);
+    const byTitle = titleIndex();
     let addedSongs = 0;
 
     d.sets = DEFAULT_TEMPLATE.map((set) => ({
@@ -1414,7 +1431,7 @@
     const payload = LZString.compressToEncodedURIComponent(JSON.stringify({
       v: 1, kind: 'list', sid,
       couple: names,
-      songs: songs.map((s) => s.title),
+      songs: songs.filter((s) => s.onSite !== false).map((s) => s.title),
     }));
     picksUrl = REQUEST_PAGE_URL + '#p=' + payload;
     $('#psBlurb').textContent = 'Send ' + (names || 'the couple') +
@@ -1456,8 +1473,7 @@
         'device. Apply them to "' + (d.header.couple || 'Untitled') +
         '"?')) return;
     }
-    const byTitle = new Map();
-    for (const s of state.library) byTitle.set(normTitle(s.title), s);
+    const byTitle = titleIndex();
     const seedByTitle = new Map();
     for (const s of SEED_LIBRARY) seedByTitle.set(normTitle(s.title), s);
     const verdicts = {};

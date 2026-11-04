@@ -151,6 +151,7 @@
   <div class="sheet-card">
     <h2 id="seTitle">New song</h2>
     <label>Title <input id="seSongTitle" autocomplete="off"></label>
+    <label>Artist <input id="seArtist" autocomplete="off" placeholder="e.g. Cold Chisel"></label>
     <div class="se-parts">
       <div class="se-parts-label">Sung by <span>- one row per singer, each in their own key</span></div>
       <div id="sePartList"></div>
@@ -159,6 +160,7 @@
     <label>Note - every setlist <input id="seNote" autocomplete="off" placeholder="e.g. full step down"></label>
     <label id="seDocNoteWrap" class="hidden">Note - this setlist only
       <input id="seDocNote" autocomplete="off" placeholder="e.g. cut it short tonight"></label>
+    <label class="se-check"><input id="seOnSite" type="checkbox" checked> On the website and couples' song picks</label>
     <div class="sheet-actions">
       <button id="seDelete" class="ghost danger">Delete</button>
       <span class="grow"></span>
