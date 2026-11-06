@@ -807,3 +807,14 @@ button.ghost.wide:hover {
 .lib-row { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .lib-row.sortable-chosen { background: var(--accent-soft); }
 .lib-dragging .set-items { min-height: 40px; }
+
+/* iPad (and the hub's frame beside its menu): a narrower library leaves the
+   setlist room, and the header's rows wrap instead of cutting words off. */
+@media (min-width: 761px) and (max-width: 1100px) {
+  main { grid-template-columns: 270px 1fr; gap: 14px; padding: 14px; }
+  .paper { padding: 26px 22px; }
+  .h-grid { grid-template-columns: 1fr 1fr; }
+  .h-dance { flex-wrap: wrap; margin-top: 10px; }
+  .h-dance-label { width: 100%; }
+  .fd-main, .h-dance .fd-notes { flex: 1 1 100%; }
+}

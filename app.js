@@ -948,7 +948,15 @@
       delay: 200,
       delayOnTouchOnly: true,
       animation: 140,
-      onStart: () => document.body.classList.add('lib-dragging'),
+      // On a phone or a portrait iPad the library is a sheet over the
+      // setlist: it slides away once a drag starts, so there's somewhere
+      // to drop (the dragged song rides on the page, not the sheet).
+      fallbackOnBody: true,
+      onStart: () => {
+        document.body.classList.add('lib-dragging');
+        $('#libraryPane').classList.remove('open');
+        $('#libToggle').textContent = 'Library';
+      },
       onEnd: () => {
         document.body.classList.remove('lib-dragging');
         libDraggedAt = Date.now();
