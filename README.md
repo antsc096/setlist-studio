@@ -1,3 +1,6 @@
+> **Retired (2026-11-07).** Setlist Studio is part of the band hub now: it lives in the
+> `sugar-whiskey-site` repo at `studio/`, and every change is made there. Don't edit this repo.
+
 # Sugar Whiskey Setlist Manager
 
 A setlist builder for The Sugar Whiskey Band, created by Anthony Collins
