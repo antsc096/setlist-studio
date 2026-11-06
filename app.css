@@ -160,7 +160,9 @@ main > * { min-width: 0; }
   padding: 8px 10px; border-radius: 9px; cursor: pointer;
   transition: background .12s ease;
 }
-.lib-row:hover { background: var(--accent-soft); }
+@media (hover: hover) {
+  .lib-row:hover { background: var(--accent-soft); }
+}
 .lib-row .t { flex: 1; min-width: 0; }
 .lib-row .t .title {
   font-weight: 550; overflow: hidden; text-overflow: ellipsis;
@@ -177,8 +179,10 @@ main > * { min-width: 0; }
   padding: 4px 8px; border-radius: 6px; font-size: 12.5px; font-weight: 550;
   opacity: 0; transition: opacity .12s ease;
 }
-.lib-row:hover .edit { opacity: 1; }
-.lib-row .edit:hover { background: var(--paper); color: var(--ink); }
+@media (hover: hover) {
+  .lib-row:hover .edit { opacity: 1; }
+  .lib-row .edit:hover { background: var(--paper); color: var(--ink); }
+}
 
 /* --- Document ---------------------------------------------------------- */
 .paper {
@@ -398,7 +402,9 @@ main > * { min-width: 0; }
   padding: 5px 6px 5px 0; border-radius: 8px;
   transition: background .12s ease;
 }
-.entry:hover { background: var(--well); }
+@media (hover: hover) {
+  .entry:hover { background: var(--well); }
+}
 .entry .num {
   width: 24px; text-align: right; color: var(--ink-mute); font-size: 13px;
   font-variant-numeric: tabular-nums; flex: none;
@@ -407,7 +413,9 @@ main > * { min-width: 0; }
   color: var(--line-strong); cursor: grab; padding: 2px 4px; flex: none;
   font-size: 13px;
 }
-.entry:hover .grip { color: var(--ink-mute); }
+@media (hover: hover) {
+  .entry:hover .grip { color: var(--ink-mute); }
+}
 .entry .song { flex: 1; min-width: 0; cursor: pointer; }
 .entry .song .title {
   font-weight: 480; overflow: hidden; text-overflow: ellipsis;
@@ -447,8 +455,10 @@ main > * { min-width: 0; }
   padding: 2px 7px; border-radius: 6px; flex: none;
   opacity: 0; transition: opacity .12s ease;
 }
-.entry:hover .rm { opacity: 1; }
-.entry .rm:hover { color: var(--new); background: var(--new-soft); }
+@media (hover: hover) {
+  .entry:hover .rm { opacity: 1; }
+  .entry .rm:hover { color: var(--new); background: var(--new-soft); }
+}
 
 /* A note the song carries on this setlist only. */
 .entry .note .doc-note { color: var(--accent-deep); font-weight: 550; }
@@ -775,3 +785,25 @@ button.ghost.wide:hover {
   background: var(--accent); border: none; color: #fff;
   font-weight: 650; padding: 8px 16px; border-radius: 8px; margin-top: 4px;
 }
+
+/* Touch screens: a tap that changes something on hover only "hovers" on an
+   iPad (the song lit up but wasn't added), so hover effects are for a mouse
+   only (above), and the buttons hover would show are always there. */
+@media (hover: none) {
+  .lib-row .edit, .entry .rm { opacity: 1; }
+  .entry .grip { color: var(--ink-mute); }
+}
+/* A finger needs a bigger handle to move a song (about 44px, Apple's
+   smallest comfortable target). */
+@media (pointer: coarse) {
+  .entry .grip {
+    display: flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px; margin: -6px 0 -6px -4px; padding: 0;
+    font-size: 20px; touch-action: none;
+  }
+}
+/* Dragging a song from the library into a set: press and hold on a touch
+   screen (so a tap still adds it, and a swipe still scrolls). */
+.lib-row { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.lib-row.sortable-chosen { background: var(--accent-soft); }
+.lib-dragging .set-items { min-height: 40px; }

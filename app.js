@@ -628,6 +628,14 @@
         group: 'sets',
         handle: '.grip',
         animation: 140,
+        // A song dragged in from the library, dropped just here.
+        onAdd: (evt) => {
+          if (evt.from !== $('#libList')) return;
+          const song = songById(evt.item.dataset.songId);
+          evt.item.remove();
+          if (song) addSongAt(song, Number(evt.to.dataset.set), evt.newIndex);
+          else renderSets();
+        },
         onEnd: (evt) => {
           const fromSet = d.sets[Number(evt.from.dataset.set)];
           const toSet = d.sets[Number(evt.to.dataset.set)];
@@ -876,7 +884,11 @@
       });
       li.appendChild(edit);
 
-      li.addEventListener('click', () => addSongToActive(song));
+      li.dataset.songId = song.id;
+      li.addEventListener('click', () => {
+        if (Date.now() - libDraggedAt < 400) return;  // the end of a drag, not a tap
+        addSongToActive(song);
+      });
       list.appendChild(li);
     }
 
@@ -892,6 +904,43 @@
       return;
     }
     placeSong(song, song.parts.length ? song.parts[0].id : '');
+  }
+
+  // Dragged from the library to a place in a set.
+  function addSongAt(song, setIndex, index) {
+    const put = (partId) => {
+      const d = doc();
+      const set = d.sets[setIndex];
+      if (!set) return;
+      set.items.splice(Math.min(index, set.items.length), 0, {
+        songId: song.id, partId, requested: pleaseFor(d, song.id),
+      });
+      save(); renderSets(); renderLibrary();
+    };
+    renderSets();  // the dropped row goes; the song arrives once its singer is known
+    if (song.parts.length > 1) askSinger(song, (part) => put(part.id));
+    else put(song.parts.length ? song.parts[0].id : '');
+  }
+
+  // The library's songs drag into any set, anywhere (copies: the library
+  // keeps them). With a mouse at once; on a touch screen, press and hold.
+  let libDraggedAt = 0;
+  function makeLibraryDraggable() {
+    new Sortable($('#libList'), {
+      group: { name: 'sets', pull: 'clone', put: false },
+      sort: false,
+      draggable: '.lib-row',
+      filter: '.edit',
+      preventOnFilter: false,
+      delay: 200,
+      delayOnTouchOnly: true,
+      animation: 140,
+      onStart: () => document.body.classList.add('lib-dragging'),
+      onEnd: () => {
+        document.body.classList.remove('lib-dragging');
+        libDraggedAt = Date.now();
+      },
+    });
   }
 
   // A PLEASE PLAY from the couple IS a request: any line it lands on
@@ -1785,6 +1834,7 @@
     });
 
     $('#libSearch').addEventListener('input', renderLibrary);
+    makeLibraryDraggable();
     $('#libAdd').addEventListener('click', () => openEditor(null));
 
     $('#seAddPart').addEventListener('click', () => {
