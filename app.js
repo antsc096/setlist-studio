@@ -184,6 +184,19 @@
     });
   }
 
+  // For the hub's "Save and send to band": resolves once every change is
+  // saved (a waiting one goes now); fails if the hub can't be reached.
+  window.studioSaved = () => new Promise((resolve, reject) => {
+    if (!hub) { resolve(); return; }
+    if (hubTimer) hubSave();
+    const started = Date.now();
+    (function check() {
+      if (!hubTimer && !hubBusy) { resolve(); return; }
+      if (Date.now() - started > 15000) { reject(new Error('The setlist couldn\'t be saved: check the connection and try again.')); return; }
+      setTimeout(check, 100);
+    })();
+  });
+
   // Someone else's newer setlists, in place of these. This device stays
   // on the setlist it had open.
   function adoptHub(value) {
